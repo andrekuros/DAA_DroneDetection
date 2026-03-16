@@ -1,0 +1,6 @@
+opencv-python
+mss
+pywin32
+numpy
+msgpack-rpc-python
+msgpack==0.6.2   # IMPORTANTE: versões >= 1.0 removeram o arg 'encoding' usado pelo msgpackrpc

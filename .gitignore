@@ -1,0 +1,25 @@
+# Virtual environment
+venv/
+
+# Dataset output (large files)
+dataset/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs e capturas temporárias
+*.avi
+*.mp4
+capture_*.png
