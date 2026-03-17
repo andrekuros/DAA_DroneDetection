@@ -1,6 +1,6 @@
-# DAA DroneDetection — Simulação e Captura com Colosseum/AirSim
+# DAA DroneDetection — Simulação e Captura com Cosys-AirSim
 
-Ferramentas Python para simular aproximação de drones intrusos no Colosseum (fork do AirSim) e capturar dados para treinamento de sistemas de Detecção e Classificação de Aeronaves (DAA).
+Ferramentas Python para simular aproximação de drones intrusos no [Cosys-AirSim](https://github.com/Cosys-Lab/Cosys-AirSim) e capturar dados para treinamento de sistemas de Detecção e Classificação de Aeronaves (DAA).
 
 ---
 
@@ -13,7 +13,8 @@ DAA_DroneDetection/
 │   ├── scenarios.py               # Definições de cenários (26 cenários pré-configurados)
 │   └── screen_capture.py          # Captura de tela em tempo real (monitor de execução)
 ├── config/
-│   └── colosseum_settings.json    # Settings pré-configurado para Colosseum
+│   ├── cosys_airsim_settings.json # Settings para Cosys-AirSim (Documents/AirSim)
+│   └── materials.csv               # Lista de materiais para segmentação (Documents/AirSim)
 ├── requirements.txt
 └── README.md
 ```
@@ -24,27 +25,29 @@ DAA_DroneDetection/
 
 | Software | Versão mínima | Observações |
 |---|---|---|
-| Python | 3.10+ | [python.org](https://www.python.org/downloads/) |
+| Python | 3.7+ | [python.org](https://www.python.org/downloads/) |
 | Git | qualquer | Para clonar o repositório |
-| Colosseum | 2.3.0+ | Simulador — veja seção abaixo |
+| Cosys-AirSim | — | Simulador Unreal — veja seção abaixo |
 
 > [!NOTE]
-> Testado em **Windows 10/11** com Python 3.11 e Colosseum 2.3.0.
+> Testado em **Windows 10/11** com Python 3.11 e Cosys-AirSim (Unreal 5.x).
 
 ---
 
-## 1. Instalar o Colosseum
+## 1. Instalar o Cosys-AirSim
 
-1. Baixe o binário do Colosseum em: https://github.com/CodexLabsLLC/Colosseum/releases
-2. Extraia em qualquer pasta (ex: `C:\Colosseum\`)
-3. Copie o arquivo de configuração do projeto para `Documents\Colosseum\`:
+1. Siga a documentação oficial: [Cosys-AirSim — How to Get It](https://cosys-lab.github.io/Cosys-AirSim/) (binário pré-compilado ou build from source).
+2. Copie os arquivos de configuração para `Documents\AirSim\` (o simulador só lê desse path):
 
 ```powershell
-Copy-Item config\colosseum_settings.json "$env:USERPROFILE\Documents\Colosseum\settings.json"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\Documents\AirSim" | Out-Null
+Copy-Item config\cosys_airsim_settings.json "$env:USERPROFILE\Documents\AirSim\settings.json"
+Copy-Item config\materials.csv "$env:USERPROFILE\Documents\AirSim\materials.csv"
 ```
 
 > [!IMPORTANT]
-> O `settings.json` configura um drone chamado **`Drone1`** com câmeras RGB (640×480), Depth e Segmentation ativas. Sem ele, o controlador não encontra o veículo.
+> - **settings.json**: usa `SettingsVersion: 2.0` (exigido pelo Cosys-AirSim). Define o drone **`Drone1`** e câmeras RGB, Depth e Segmentation.
+> - **materials.csv**: evita o erro "Material list was not found" na inicialização do stencil (segmentação). Se o ambiente Unreal do Cosys-AirSim vier com outro `materials.csv`, use o dele em vez do nosso.
 
 ---
 
@@ -72,37 +75,29 @@ python -m venv venv
 
 ## 4. Instalar Dependências
 
-### 4.1 Dependências padrão (pip)
+Instale tudo com pip (o cliente Cosys-AirSim instala numpy e rpc-msgpack automaticamente):
 
 ```powershell
-pip install numpy mss opencv-python pywin32 msgpack-rpc-python "msgpack==0.6.2"
+pip install -r requirements.txt
 ```
 
-> [!IMPORTANT]
-> É obrigatório fixar `msgpack==0.6.2`. Versões `>= 1.0` removeram o argumento `encoding` usado internamente pelo `msgpack-rpc-python`, causando `TypeError` ao conectar ao Colosseum.
-
-### 4.2 Módulo `airsim` do Colosseum
-
-> [!IMPORTANT]
-> O pacote `airsim` no PyPI está **quebrado para Python 3.10+**. Use o script abaixo para instalar diretamente do repositório do Colosseum.
+Ou manualmente:
 
 ```powershell
-# Cria pasta do módulo no venv
-$dest = ".\venv\Lib\site-packages\airsim"
-New-Item -ItemType Directory -Force $dest | Out-Null
-
-# Baixa os 5 arquivos do módulo airsim
-$base = "https://raw.githubusercontent.com/CodexLabsLLC/Colosseum/main/PythonClient/airsim"
-@("__init__.py", "client.py", "types.py", "utils.py", "pfm.py") | ForEach-Object {
-    Invoke-WebRequest "$base/$_" -OutFile "$dest\$_" -UseBasicParsing
-    Write-Host "OK: $_"
-}
+pip install cosysairsim opencv-python mss pywin32 numpy
 ```
 
-### 4.3 Verificar instalação
+**Alternativa (from source):** clone [Cosys-AirSim](https://github.com/Cosys-Lab/Cosys-AirSim.git) e instale o Python client:
 
 ```powershell
-python -c "import airsim; import cv2; import mss; print('Tudo OK!')"
+cd path\to\Cosys-AirSim\PythonClient
+pip install .
+```
+
+### Verificar instalação
+
+```powershell
+python -c "import cosysairsim; import cv2; import mss; print('Tudo OK!')"
 ```
 
 ---
@@ -130,8 +125,8 @@ Total: 26 cenários | Observador NED: (0.0, 0.0, -5.0)
 
 ### 5.2 Executar um cenário único
 
-1. Abra o Colosseum (execute o arquivo `.exe` do binário baixado)
-2. Aguarde o mapa carregar completamente
+1. Inicie o ambiente Cosys-AirSim (Unreal com plugin Cosys-AirSim).
+2. Aguarde o mapa carregar completamente.
 3. Execute:
 
 ```powershell
@@ -159,15 +154,15 @@ python tools\experiment_controller.py --all --output-dir dataset\
 | `--image-types scene depth seg` | Tipos de imagem a capturar | `scene depth seg` |
 | `--vehicle <nome>` | Nome do veículo no settings.json | `Drone1` |
 | `--camera <nome>` | Nome da câmera | `front_center` |
-| `--ip <endereço>` | IP do host Colosseum | `127.0.0.1` |
+| `--ip <endereço>` | IP do host Cosys-AirSim | `127.0.0.1` |
 
 ### 5.5 Monitorar visualmente a execução
 
-O `screen_capture.py` captura a janela do Colosseum em tempo real para você ver o que está acontecendo:
+O `screen_capture.py` captura a janela do simulador em tempo real:
 
 ```powershell
 # Em um terminal separado, antes de iniciar o experimento:
-python tools\screen_capture.py --title "Colosseum"
+python tools\screen_capture.py --title "Unreal"
 ```
 
 Controles da janela de captura: `Q`/`ESC` = sair | `S` = salvar frame | `P` = pausar | `+`/`-` = zoom
@@ -230,7 +225,7 @@ Para adicionar novos cenários, edite `tools/scenarios.py` e adicione à lista `
 
 ## 8. Sistema de Coordenadas (NED)
 
-O AirSim/Colosseum usa **NED (North-East-Down)**:
+O Cosys-AirSim usa **NED (North-East-Down)**:
 - **X** = Norte (positivo para frente)
 - **Y** = Leste (positivo para direita)
 - **Z** = Para baixo (negativo = altitude acima do solo)
@@ -247,20 +242,26 @@ O ângulo de **azimute** dos cenários segue a convenção geográfica:
 
 ## 9. Solução de Problemas
 
-### ❌ `airsim` não conecta ao Colosseum
-- Verifique que o Colosseum está rodando antes de executar o controlador
-- Confirme que o `settings.json` foi copiado para `Documents\Colosseum\`
-- Tente `--ip 127.0.0.1` (padrão) ou o IP da máquina com o simulador
+### ❌ Cliente não conecta ao Cosys-AirSim
+- Verifique que o ambiente Unreal com Cosys-AirSim está rodando antes do controlador
+- Confirme que o `settings.json` está em `Documents\AirSim\`
+- Use `--ip 127.0.0.1` (padrão) ou o IP da máquina onde o simulador roda
 
-### ❌ `ModuleNotFoundError: No module named 'airsim'`
-- Execute o script de instalação manual da seção **4.2**
+### ❌ `ModuleNotFoundError: No module named 'cosysairsim'`
+- Instale com: `pip install cosysairsim` ou use o PythonClient do repositório Cosys-AirSim
 
 ### ❌ `KeyError: vehicle not found`
-- O nome do veículo no `settings.json` deve bater com `--vehicle` (padrão: `Drone1`)
+- O nome do veículo no `settings.json` deve coincidir com `--vehicle` (padrão: `Drone1`)
 
 ### ❌ Imagens em branco / pretas
-- Aguarde o Colosseum carregar completamente antes de rodar o script
-- Verifique se o `ImageType` está configurado no `settings.json` (`CaptureSettings`)
+- Aguarde o ambiente Unreal carregar completamente antes de rodar o script
+- Verifique `CaptureSettings` no `settings.json` para os ImageTypes usados
+
+### ❌ "You are using newer version of AirSim with older version of settings.json"
+- O projeto já usa `SettingsVersion: 2.0` em `config\cosys_airsim_settings.json`. Copie de novo para `Documents\AirSim\settings.json` e reinicie o simulador.
+
+### ❌ "Material list was not found: .../materials.csv"
+- Copie `config\materials.csv` para `Documents\AirSim\materials.csv`. Se o seu ambiente Cosys-AirSim/Unreal tiver um `materials.csv` próprio, use esse em vez do nosso.
 
 ### ❌ `PSSecurityException` ao ativar o venv
 ```powershell
@@ -273,9 +274,8 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 | Pacote | Uso |
 |---|---|
-| `airsim` | API de controle do Colosseum |
+| `cosysairsim` | API Python do [Cosys-AirSim](https://github.com/Cosys-Lab/Cosys-AirSim) |
 | `numpy` | Manipulação de arrays de imagem |
 | `opencv-python` | Exibição e gravação de vídeo (`screen_capture.py`) |
 | `mss` | Captura de tela de alta velocidade |
 | `pywin32` | Seleção de janela por título (Windows) |
-| `msgpack-rpc-python` | Transporte RPC do protocolo AirSim |

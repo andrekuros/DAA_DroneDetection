@@ -1,0 +1,49 @@
+{
+  "SettingsVersion": 2.0,
+  "SimMode": "Multirotor",
+  "ViewMode": "",
+  "ClockSpeed": 1.0,
+
+  "Vehicles": {
+    "Observer": {
+      "VehicleType": "SimpleFlight",
+      "X": 0,
+      "Y": 0,
+      "Z": -50,
+      "Yaw": 0,
+      "Cameras": {
+        "front_center": {
+          "CaptureSettings": [
+            {"ImageType": 0, "Width": 640, "Height": 480, "FOV_Degrees": 90, "AutoExposureSpeed": 100, "MotionBlurAmount": 0},
+            {"ImageType": 1, "Width": 640, "Height": 480, "FOV_Degrees": 90},
+            {"ImageType": 5, "Width": 640, "Height": 480, "FOV_Degrees": 90}
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        }
+      }
+    },
+    "Drone1": {
+      "VehicleType": "SimpleFlight",
+      "X": 50,
+      "Y": 0,
+      "Z": -50,
+      "Yaw": 0,
+      "Cameras": {
+        "front_center": {
+          "CaptureSettings": [
+            {"ImageType": 0, "Width": 640, "Height": 480, "FOV_Degrees": 90}
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 180
+        }
+      }
+    }
+  },
+
+  "SubWindows": [
+    {"WindowID": 0, "ImageType": 0, "CameraName": "front_center", "VehicleName": "Observer", "Visible": true},
+    {"WindowID": 1, "ImageType": 1, "CameraName": "front_center", "VehicleName": "Observer", "Visible": false},
+    {"WindowID": 2, "ImageType": 5, "CameraName": "front_center", "VehicleName": "Observer", "Visible": false}
+  ]
+}

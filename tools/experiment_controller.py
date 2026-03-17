@@ -1,11 +1,11 @@
 """
-experiment_controller.py — Controlador de Experimentos AirSim/Colosseum
-========================================================================
-Orquestra cenários de aproximação de drone intruso usando a API nativa do
-Colosseum (simGetImages, moveToPositionAsync, simEnableWeather, etc.).
+experiment_controller.py — Controlador de Experimentos Cosys-AirSim
+===================================================================
+Orquestra cenários de aproximação de drone intruso usando a API do
+Cosys-AirSim (simGetImages, moveToPositionAsync, simEnableWeather, etc.).
 
 Dependências:
-    pip install airsim opencv-python numpy
+    pip install cosysairsim opencv-python numpy
 
 Uso:
     # Listar cenários sem conectar ao simulador
@@ -36,14 +36,23 @@ from pathlib import Path
 
 import numpy as np
 
-# ─── Importação condicional do AirSim (permite --dry-run sem simulador) ───────
+# ─── Importação Cosys-AirSim (permite --dry-run sem simulador) ───────────────
 try:
-    import airsim
+    import cosysairsim as airsim
     HAS_AIRSIM = True
+    # Cosys-AirSim usa nomes diferentes para os helpers de quaternion
+    if not hasattr(airsim, "to_quaternion"):
+        airsim.to_quaternion = airsim.euler_to_quaternion
+    if not hasattr(airsim, "to_eularian_angles"):
+        airsim.to_eularian_angles = airsim.quaternion_to_euler_angles
 except ImportError:
-    HAS_AIRSIM = False
-    print("[AVISO] airsim não instalado. Apenas --dry-run disponível.")
-    print("        Instale com: pip install airsim")
+    try:
+        import airsim
+        HAS_AIRSIM = True
+    except ImportError:
+        HAS_AIRSIM = False
+        print("[AVISO] cosysairsim não instalado. Apenas --dry-run disponível.")
+        print("        Instale com: pip install cosysairsim")
 
 from scenarios import (
     ApproachScenario,
@@ -77,15 +86,18 @@ FLOAT_IMAGE_TYPES = {1, 2, 3, 4}   # DepthPlanar, DepthPerspective, DepthVis, Di
 
 @dataclass
 class ControllerConfig:
-    observer_pos: tuple         = (0.0, 0.0, -5.0)   # NED: x,y,z do ponto observador
-    stop_distance_m: float      = 5.0                 # para ao chegar a X m do observador
+    observer_pos: tuple         = (0.0, 0.0, -51.0)  # NED: posicao do observador (altitude 50m para evitar terreno)
+    stop_distance_m: float      = 1.0                 # para ao chegar a X m do observador
     capture_interval_s: float   = 0.1                 # intervalo entre capturas (~ 10 fps)
-    vehicle_name: str           = "Drone1"            # nome do veículo intruso no settings.json
-    camera_name: str            = "front_center"      # câmera de captura
+    observer_vehicle_name: str  = "Observer"           # veiculo com a camera (quem "vê" o intruso)
+    vehicle_name: str           = "Drone1"            # veiculo intruso (quem se aproxima)
+    camera_name: str            = "front_center"      # camera de captura (no Observer)
     image_types: list[str]      = None                # subset de IMAGE_TYPE_MAP.keys()
     output_dir: Path            = Path("dataset")
     airsim_ip: str              = "127.0.0.1"
-    takeoff_altitude_m: float   = 5.0                 # altitude de decolagem (metros acima do solo)
+    takeoff_altitude_m: float   = 50.0                 # altitude de decolagem (metros acima do solo)
+    max_frames: int | None       = None                # limite de frames (None = sem limite; util para teste rapido)
+    clock_speed: float          = 0.0                  # velocidade do relogio celestial (0 = sol parado)
 
     def __post_init__(self):
         if self.image_types is None:
@@ -128,7 +140,7 @@ def write_pfm_manual(path: Path, data: np.ndarray):
 
 class ExperimentController:
     """
-    Orquestra experimentos de aproximação de drone no Colosseum/AirSim.
+    Orquestra experimentos de aproximação de drone no Cosys-AirSim.
 
     Fluxo por cenário:
         1. Aplica clima e horário
@@ -147,8 +159,8 @@ class ExperimentController:
 
     def connect(self):
         """
-        Conecta ao Colosseum, detecta veículos disponíveis e habilita controle API.
-        Se o veículo configurado não existir, tenta o primeiro disponível.
+        Conecta ao Cosys-AirSim, detecta veículos disponíveis e habilita controle API.
+        Já deixa Observer e Intruso pairando aproximadamente na altitude desejada.
         """
         self.client = airsim.MultirotorClient(ip=self.cfg.airsim_ip)
         self.client.confirmConnection()
@@ -164,26 +176,47 @@ class ExperimentController:
         if configured in available:
             vehicle = configured
         else:
-            # Colosseum está rodando com settings.json diferente do nosso
             if available:
                 vehicle = available[0]
-                print(f"\n[AVISO] Veículo '{configured}' não encontrado no simulador.")
-                print(f"        Usando '{vehicle}' (primeiro disponível).")
-                print(f"        Para usar '{configured}', copie o settings.json:")
-                print(f"        Copy-Item config\\colosseum_settings.json "
-                      f"\"%USERPROFILE%\\Documents\\Colosseum\\settings.json\"")
-                print(f"        Depois reinicie o Colosseum.\n")
+                print(f"\n[AVISO] Intruso '{configured}' nao encontrado. Usando '{vehicle}'.")
+                print(f"        Copie config\\cosys_airsim_settings.json para Documents\\AirSim\\ e reinicie.\n")
                 self.cfg.vehicle_name = vehicle
             else:
-                # Sem listagem disponível — tenta string vazia (veículo padrão)
                 vehicle = ""
-                print(f"\n[AVISO] Não foi possível listar veículos. "
-                      f"Tentando veículo padrão (string vazia).")
                 self.cfg.vehicle_name = vehicle
 
-        self.client.enableApiControl(True, vehicle_name=self.cfg.vehicle_name)
-        print(f"[OK] Conectado ao Colosseum em {self.cfg.airsim_ip} | "
-              f"Veículo: '{self.cfg.vehicle_name}'")
+        obs = self.cfg.observer_vehicle_name
+        if obs and available and obs not in available:
+            print(f"\n[AVISO] Observer '{obs}' nao encontrado. Captura do intruso '{vehicle}'.")
+            self.cfg.observer_vehicle_name = vehicle
+        if not obs:
+            self.cfg.observer_vehicle_name = vehicle
+
+        # Habilita API e já coloca os veículos em voo estável
+        for v_name, z_target in [
+            (self.cfg.observer_vehicle_name, self.cfg.observer_pos[2]),
+            (self.cfg.vehicle_name, self.cfg.observer_pos[2]),
+        ]:
+            if not v_name:
+                continue
+            try:
+                self.client.enableApiControl(True, vehicle_name=v_name)
+                self.client.armDisarm(True, vehicle_name=v_name)
+                # Decola e sobe/ajusta para a altitude alvo
+                self.client.takeoffAsync(vehicle_name=v_name).join()
+                self.client.moveToZAsync(
+                    z_target,
+                    velocity=2.0,
+                    vehicle_name=v_name,
+                ).join()
+            except Exception as e:
+                print(f"[AVISO] Nao foi possivel inicializar veiculo '{v_name}': {e}")
+
+        print(
+            f"[OK] Cosys-AirSim {self.cfg.airsim_ip} | "
+            f"Observer (camera): '{self.cfg.observer_vehicle_name}' | "
+            f"Intruso: '{self.cfg.vehicle_name}'"
+        )
 
     # ── Ambiente (clima + horário + vento) ────────────────────────────────────
 
@@ -227,7 +260,7 @@ class ExperimentController:
             is_enabled=True,
             start_datetime=scenario.time_of_day,
             is_start_datetime_dst=False,
-            celestial_clock_speed=0,   # congela o tempo
+            celestial_clock_speed=self.cfg.clock_speed,   # 0 = congela; >0 acelera sol
             update_interval_secs=60,
             move_sun=True,
         )
@@ -251,6 +284,42 @@ class ExperimentController:
 
     # ── Posicionamento ────────────────────────────────────────────────────────
 
+    def _position_observer_at_fixed_pose(self):
+        """
+        Coloca o veiculo Observer (camera) na posicao fixa do observador e
+        garante que ele fique pairando aproximadamente nessa altitude.
+        """
+        if not self.cfg.observer_vehicle_name or self.cfg.observer_vehicle_name == self.cfg.vehicle_name:
+            return
+
+        ox, oy, oz = self.cfg.observer_pos
+        pose = airsim.Pose(
+            position_val=airsim.Vector3r(ox, oy, oz),
+            orientation_val=airsim.to_quaternion(0, 0, 0),
+        )
+
+        # Teleporta para a posicao desejada
+        self._try_call(
+            "simSetVehiclePose(Observer)",
+            self.client.simSetVehiclePose,
+            pose,
+            ignore_collision=True,
+            vehicle_name=self.cfg.observer_vehicle_name,
+        )
+
+        # Liga motores e manda ir para a mesma altitude (evita cair no chao)
+        try:
+            self.client.armDisarm(True, vehicle_name=self.cfg.observer_vehicle_name)
+            self.client.moveToZAsync(
+                oz,
+                velocity=2.0,
+                vehicle_name=self.cfg.observer_vehicle_name,
+            ).join()
+        except Exception as e:
+            print(f"[AVISO] Nao foi possivel estabilizar Observer: {e}")
+
+        time.sleep(0.3)
+
     def _position_drone_for_scenario(self, target_pos: tuple):
         """
         Posiciona o drone para o início do cenário.
@@ -263,7 +332,7 @@ class ExperimentController:
             orientation_val=airsim.to_quaternion(0, 0, 0)
         )
 
-        print(f"  → Posicionando drone em {target_pos}...")
+        print(f"  -> Posicionando drone em {target_pos}...")
 
         # Tenta Teleport (instantâneo, mas sensível a versão)
         teleport_ok = self._try_call(
@@ -276,7 +345,7 @@ class ExperimentController:
 
         if not teleport_ok:
             # Fallback: Voo para a posição inicial
-            print("  → Usando fallback: voando até o ponto de partida...")
+            print("  -> Usando fallback: voando ate o ponto de partida...")
             # Garante que está armado e decolado
             self.client.armDisarm(True, vehicle_name=self.cfg.vehicle_name)
             self.client.takeoffAsync(vehicle_name=self.cfg.vehicle_name).join()
@@ -376,7 +445,8 @@ class ExperimentController:
         # 1. Ambiente
         self._apply_environment(scenario)
 
-        # 2. Posicionamento do intruso (com fallback para bad cast)
+        # 2. Posiciona o Observer (camera) na posicao fixa; intruso na posicao inicial
+        self._position_observer_at_fixed_pose()
         start_pos = scenario.start_position_ned(observer_ned=cfg.observer_pos)
         self._position_drone_for_scenario(start_pos)
 
@@ -389,10 +459,13 @@ class ExperimentController:
         ).join()
         time.sleep(0.5)
 
-        # 4. Comando de aproximação (assíncrono)
-        ox, oy, oz = cfg.observer_pos
+        # 4. Comandos de aproximação (assíncronos)
+        #    - Intruso vai em direção ao observador, mantendo altitude do cenário
+        #    - Observer também é controlado pelo SimpleFlight para não cair
+        ox, oy, _ = cfg.observer_pos
+        target_z = start_pos[2]  # altitude fixa definida pelo cenário
         future = self.client.moveToPositionAsync(
-            ox, oy, oz,
+            ox, oy, target_z,
             velocity=scenario.speed_ms,
             timeout_sec=300,
             drivetrain=airsim.DrivetrainType.ForwardOnly,
@@ -400,13 +473,28 @@ class ExperimentController:
             vehicle_name=cfg.vehicle_name,
         )
 
+        # Mantém o Observer em voo controlado na mesma altitude
+        if cfg.observer_vehicle_name and cfg.observer_vehicle_name != cfg.vehicle_name:
+            try:
+                self.client.armDisarm(True, vehicle_name=cfg.observer_vehicle_name)
+                self.client.moveToPositionAsync(
+                    ox, oy, target_z,
+                    velocity=3.0,
+                    timeout_sec=300,
+                    drivetrain=airsim.DrivetrainType.ForwardOnly,
+                    yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=0),
+                    vehicle_name=cfg.observer_vehicle_name,
+                )
+            except Exception as e:
+                print(f"[AVISO] Nao foi possivel mover Observer com SimpleFlight: {e}")
+
         # 5. Loop de captura
         requests = self._build_image_requests()
         telemetry_rows = []
         frame_idx = 0
         last_capture = time.perf_counter()
 
-        print(f"  → Capturando {len(self.cfg.image_types)} tipo(s) de imagem…")
+        print(f"  -> Capturando {len(self.cfg.image_types)} tipo(s) de imagem...")
 
         while not future._set_flag:
             now = time.perf_counter()
@@ -415,36 +503,58 @@ class ExperimentController:
                 continue
             last_capture = now
 
-            # Imagens
+            # Imagens da camera do Observer (quem ve o intruso se aproximando)
             try:
                 responses = self.client.simGetImages(
-                    requests, vehicle_name=cfg.vehicle_name
+                    requests, vehicle_name=cfg.observer_vehicle_name
                 )
                 self._save_frame(responses, frame_idx, run_dir)
             except Exception as e:
                 print(f"  [AVISO] Erro na captura frame {frame_idx}: {e}")
 
-            # Telemetria
+            # Telemetria do intruso
             tele = self._get_telemetry()
             tele["frame"] = frame_idx
             tele["scenario"] = scenario.name
             telemetry_rows.append(tele)
 
-            # Distância ao observador
-            dist = ned_distance(
-                (tele["x_m"], tele["y_m"], tele["z_m"]),
-                cfg.observer_pos,
-            )
+            # Telemetria real do observer (drone proprio) se existir
+            obs_x, obs_y, obs_z = cfg.observer_pos
+            if cfg.observer_vehicle_name:
+                try:
+                    obs_state = self.client.getMultirotorState(
+                        vehicle_name=cfg.observer_vehicle_name
+                    )
+                    obs_pos = obs_state.kinematics_estimated.position
+                    obs_x = obs_pos.x_val
+                    obs_y = obs_pos.y_val
+                    obs_z = obs_pos.z_val
+                except Exception:
+                    pass
+
+            # Distância intruso–observer no plano horizontal (X–Y)
+            dx = tele["x_m"] - obs_x
+            dy = tele["y_m"] - obs_y
+            dist = math.hypot(dx, dy)
 
             if frame_idx % 10 == 0:
-                print(f"    frame {frame_idx:05d} | dist={dist:.1f}m | "
-                      f"vel=({tele['vx_ms']:.1f},{tele['vy_ms']:.1f},{tele['vz_ms']:.1f})")
+                print(
+                    f"    frame {frame_idx:05d} | "
+                    f"dist_xy={dist:.1f}m | "
+                    f"z_intruso={tele['z_m']:.1f}m | "
+                    f"z_observer={obs_z:.1f}m | "
+                    f"vel=({tele['vx_ms']:.1f},{tele['vy_ms']:.1f},{tele['vz_ms']:.1f})"
+                )
 
             frame_idx += 1
 
-            # Para quando chega perto do observador
+            # Para quando chega perto do observador (distancia no plano XY)
             if dist <= cfg.stop_distance_m:
-                print(f"  → Chegou a {dist:.1f}m do observador. Encerrando cenário.")
+                print(f"  -> Chegou a {dist:.1f}m do observador. Encerrando cenario.")
+                break
+            # Limite de frames (teste rapido)
+            if cfg.max_frames is not None and frame_idx >= cfg.max_frames:
+                print(f"  -> Limite de {cfg.max_frames} frames. Encerrando cenario.")
                 break
 
         # Cancela movimento se ainda ativo
@@ -460,20 +570,25 @@ class ExperimentController:
                 writer = csv.DictWriter(f, fieldnames=list(telemetry_rows[0].keys()))
                 writer.writeheader()
                 writer.writerows(telemetry_rows)
-            print(f"  → {frame_idx} frames | telemetria: {csv_path}")
+            print(f"  -> {frame_idx} frames | telemetria: {csv_path}")
         else:
             print("  [AVISO] Nenhum frame capturado.")
 
-        # 7. Reset do veículo para próximo cenário
+        # 7. Reset para proximo cenario
         self.client.reset()
         self.client.enableApiControl(True, vehicle_name=cfg.vehicle_name)
+        if cfg.observer_vehicle_name and cfg.observer_vehicle_name != cfg.vehicle_name:
+            try:
+                self.client.enableApiControl(True, vehicle_name=cfg.observer_vehicle_name)
+            except Exception:
+                pass
 
     # ── Execução batch ────────────────────────────────────────────────────────
 
     def run_all(self, scenarios: list[ApproachScenario]):
         """Executa todos os cenários em sequência."""
         total = len(scenarios)
-        print(f"\n[INFO] Iniciando {total} cenário(s)…")
+        print(f"\n[INFO] Iniciando {total} cenario(s)...")
         for i, scenario in enumerate(scenarios, 1):
             try:
                 self.run_scenario(scenario, run_idx=i)
@@ -481,11 +596,12 @@ class ExperimentController:
                 print("\n[INTERROMPIDO] Encerrando experimento.")
                 break
             except Exception as e:
-                print(f"[ERRO] Cenário '{scenario.name}': {e}")
-                # Tenta recuperar para continuar com o próximo
+                print(f"[ERRO] Cenario '{scenario.name}': {e}")
                 try:
                     self.client.reset()
                     self.client.enableApiControl(True, vehicle_name=self.cfg.vehicle_name)
+                    if self.cfg.observer_vehicle_name and self.cfg.observer_vehicle_name != self.cfg.vehicle_name:
+                        self.client.enableApiControl(True, vehicle_name=self.cfg.observer_vehicle_name)
                 except Exception:
                     pass
         print(f"\n[CONCLUÍDO] Dataset salvo em: {self.cfg.output_dir.resolve()}")
@@ -497,7 +613,7 @@ class ExperimentController:
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Controlador de experimentos AirSim – aproximação de drone intruso."
+        description="Controlador de experimentos Cosys-AirSim – aproximação de drone intruso."
     )
     p.add_argument(
         "--dry-run", action="store_true",
@@ -521,11 +637,15 @@ def parse_args():
     )
     p.add_argument(
         "--observer-pos", nargs=3, type=float, metavar=("X", "Y", "Z"),
-        default=[0.0, 0.0, -5.0],
-        help="Posição NED do observador em metros (padrão: 0 0 -5).",
+        default=[0.0, 0.0, -50.0],
+        help="Posicao NED do observador em metros (padrao: 0 0 -50 = 50m altura).",
     )
     p.add_argument(
-        "--stop-dist", type=float, default=5.0,
+        "--observer-vehicle", type=str, default="Observer",
+        help="Veiculo com a camera que ve o intruso (padrao: Observer).",
+    )
+    p.add_argument(
+        "--stop-dist", type=float, default=3.0,
         help="Distância (m) para interromper aproximação (padrão: 5).",
     )
     p.add_argument(
@@ -541,7 +661,7 @@ def parse_args():
     )
     p.add_argument(
         "--vehicle", type=str, default="Drone1",
-        help="Nome do veículo intruso no settings.json do Colosseum (padrão: Drone1).",
+        help="Nome do veículo intruso no settings.json do Cosys-AirSim (padrão: Drone1).",
     )
     p.add_argument(
         "--camera", type=str, default="front_center",
@@ -549,11 +669,19 @@ def parse_args():
     )
     p.add_argument(
         "--ip", type=str, default="127.0.0.1",
-        help="IP do host Colosseum (padrão: 127.0.0.1).",
+        help="IP do host Cosys-AirSim (padrão: 127.0.0.1).",
+    )
+    p.add_argument(
+        "--max-frames", type=int, default=None, metavar="N",
+        help="Limite de frames por cenario (teste rapido; ex: 50).",
+    )
+    p.add_argument(
+        "--clock-speed", type=float, default=0.0,
+        help="Velocidade do relogio celestial (0 = sol parado, 1 = tempo real, >1 acelera apenas iluminacao).",
     )
     p.add_argument(
         "--list-vehicles", action="store_true",
-        help="Lista veículos disponíveis no Colosseum e encerra.",
+        help="Lista veículos disponíveis no Cosys-AirSim e encerra.",
     )
     return p.parse_args()
 
@@ -566,13 +694,13 @@ def main():
     # ── Listar veículos no simulador ─────────────────────────────────────────
     if args.list_vehicles:
         if not HAS_AIRSIM:
-            print("[ERRO] Instale airsim para listar veículos.")
+            print("[ERRO] Instale cosysairsim para listar veículos.")
             sys.exit(1)
         tmp = airsim.MultirotorClient(ip=args.ip)
         tmp.confirmConnection()
         try:
             vehicles = tmp.listVehicles()
-            print(f"\nVeículos disponíveis no Colosseum ({args.ip}):")
+            print(f"\nVeículos disponíveis no Cosys-AirSim ({args.ip}):")
             for v in vehicles:
                 print(f"  - {v}")
         except Exception as e:
@@ -609,7 +737,7 @@ def main():
 
     # ── Valida AirSim ────────────────────────────────────────────────────────
     if not HAS_AIRSIM:
-        print("[ERRO] Instale airsim: pip install airsim")
+        print("[ERRO] Instale cosysairsim: pip install cosysairsim")
         sys.exit(1)
 
     # ── Monta configuração e executa ──────────────────────────────────────────
@@ -617,11 +745,14 @@ def main():
         observer_pos=tuple(args.observer_pos),
         stop_distance_m=args.stop_dist,
         capture_interval_s=args.capture_interval,
+        observer_vehicle_name=args.observer_vehicle,
         vehicle_name=args.vehicle,
         camera_name=args.camera,
         image_types=args.image_types,
         output_dir=args.output_dir,
         airsim_ip=args.ip,
+        max_frames=args.max_frames,
+        clock_speed=args.clock_speed,
     )
 
     controller = ExperimentController(cfg)

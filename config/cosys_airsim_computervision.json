@@ -1,0 +1,22 @@
+{
+  "SettingsVersion": 2.0,
+  "SimMode": "ComputerVision",
+
+  "CameraDefaults": {
+    "CaptureSettings": [
+      {
+        "ImageType": 0,
+        "Width": 640,
+        "Height": 480,
+        "FOV_Degrees": 90
+      }
+    ]
+  },
+
+  "SubWindows": [
+    { "WindowID": 0, "ImageType": 0, "CameraName": "0", "VehicleName": "", "Visible": true },
+    { "WindowID": 1, "ImageType": 3, "CameraName": "0", "VehicleName": "", "Visible": false },
+    { "WindowID": 2, "ImageType": 5, "CameraName": "0", "VehicleName": "", "Visible": false }
+  ]
+}
+
