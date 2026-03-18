@@ -118,177 +118,200 @@ _RAIN_FOG   = WeatherConfig(rain=0.5, fog=0.5)
 
 SCENARIOS: list[ApproachScenario] = [
 
-    # ── Geometria de aproximação — condições ideais ───────────────────────────
+    # =====================================================================
+    #  Camera: FOV=120deg, Yaw=0 (frente = Norte/+X)
+    #  Angulos de aproximacao limitados a ±45deg do eixo frontal
+    #  para garantir que o intruso aparece no campo de visao.
+    # =====================================================================
+
+    # ── Angulos de aproximacao (mesmo nivel, dia, 5 m/s) ──────────────────
     ApproachScenario(
-        name="frontal_clear_day",
+        name="az000_day",
         distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação frontal direta, 100m, dia claro",
+        description="Frontal direto (0 deg), dia",
     ),
     ApproachScenario(
-        name="lateral_right_clear_day",
-        distance_m=100, azimuth_deg=90, altitude_offset_m=0, speed_ms=5,
+        name="az015_day",
+        distance_m=100, azimuth_deg=15, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação pelo lado direito (Leste), 100m",
+        description="15 deg direita, dia",
     ),
     ApproachScenario(
-        name="lateral_left_clear_day",
-        distance_m=100, azimuth_deg=270, altitude_offset_m=0, speed_ms=5,
+        name="az345_day",
+        distance_m=100, azimuth_deg=345, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação pelo lado esquerdo (Oeste), 100m",
+        description="15 deg esquerda, dia",
     ),
     ApproachScenario(
-        name="diagonal_NE_clear_day",
+        name="az030_day",
+        distance_m=100, azimuth_deg=30, altitude_offset_m=0, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="30 deg direita, dia",
+    ),
+    ApproachScenario(
+        name="az330_day",
+        distance_m=100, azimuth_deg=330, altitude_offset_m=0, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="30 deg esquerda, dia",
+    ),
+    ApproachScenario(
+        name="az045_day",
         distance_m=100, azimuth_deg=45, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação diagonal NE, 100m",
+        description="45 deg direita (limite FOV), dia",
     ),
     ApproachScenario(
-        name="rear_clear_day",
-        distance_m=100, azimuth_deg=180, altitude_offset_m=0, speed_ms=5,
+        name="az315_day",
+        distance_m=100, azimuth_deg=315, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação por trás (Sul), 100m",
+        description="45 deg esquerda (limite FOV), dia",
     ),
 
-    # ── Variação de altitude ──────────────────────────────────────────────────
+    # ── Altitude — frontal, dia ───────────────────────────────────────────
     ApproachScenario(
-        name="frontal_high_altitude",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=20, speed_ms=5,
+        name="az000_up10_day",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=10, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Intruso 20m acima do observador — ângulo de mergulho",
+        description="Frontal, 10m acima, dia",
     ),
     ApproachScenario(
-        name="frontal_low_altitude",
+        name="az000_up25_day",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=25, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="Frontal, 25m acima (mergulho), dia",
+    ),
+    ApproachScenario(
+        name="az000_dn10_day",
         distance_m=100, azimuth_deg=0, altitude_offset_m=-10, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Intruso 10m abaixo do observador — ângulo de subida",
+        description="Frontal, 10m abaixo, dia",
     ),
     ApproachScenario(
-        name="frontal_extreme_high",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=50, speed_ms=5,
+        name="az000_dn25_day",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=-25, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Intrusão a 50m acima — dive vertical pronunciado",
+        description="Frontal, 25m abaixo (subida), dia",
     ),
 
-    # ── Variação de distância ─────────────────────────────────────────────────
+    # ── Angulo + altitude combinados ──────────────────────────────────────
     ApproachScenario(
-        name="close_range_50m",
-        distance_m=50, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
+        name="az030_up15_day",
+        distance_m=100, azimuth_deg=30, altitude_offset_m=15, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação curta — 50m (drone já está próximo)",
+        description="30 deg dir + 15m acima, dia",
     ),
     ApproachScenario(
-        name="medium_range_100m",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
+        name="az330_dn15_day",
+        distance_m=100, azimuth_deg=330, altitude_offset_m=-15, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Alcance médio — 100m",
+        description="30 deg esq + 15m abaixo, dia",
     ),
     ApproachScenario(
-        name="long_range_400m",
-        distance_m=400, azimuth_deg=0, altitude_offset_m=0, speed_ms=10,
+        name="az045_up10_day",
+        distance_m=100, azimuth_deg=45, altitude_offset_m=10, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Longo alcance — 400m, velocidade maior",
+        description="45 deg dir + 10m acima, dia",
+    ),
+    ApproachScenario(
+        name="az315_dn10_day",
+        distance_m=100, azimuth_deg=315, altitude_offset_m=-10, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="45 deg esq + 10m abaixo, dia",
     ),
 
-    # ── Variação de velocidade ────────────────────────────────────────────────
+    # ── Velocidade — frontal, dia ─────────────────────────────────────────
     ApproachScenario(
-        name="very_slow_2ms",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=2,
+        name="az000_v03_day",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=3,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação lenta: drone furtivo a 2 m/s",
+        description="Frontal, 3 m/s (lento), dia",
     ),
     ApproachScenario(
-        name="fast_10ms",
+        name="az000_v10_day",
         distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=10,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Aproximação rápida a 10 m/s",
+        description="Frontal, 10 m/s, dia",
     ),
     ApproachScenario(
-        name="sprint_20ms",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=20,
+        name="az000_v15_day",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=15,
         weather=_CLEAR, time_of_day=_DAY,
-        description="Sprint a 20 m/s — máxima velocidade",
+        description="Frontal, 15 m/s (rapido), dia",
     ),
 
-    # ── Variação de horário (iluminação) ──────────────────────────────────────
+    # ── Distancia — frontal, dia ──────────────────────────────────────────
     ApproachScenario(
-        name="frontal_clear_dawn",
+        name="az000_50m_day",
+        distance_m=50, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="Frontal, 50m (perto), dia",
+    ),
+    ApproachScenario(
+        name="az000_200m_day",
+        distance_m=200, azimuth_deg=0, altitude_offset_m=0, speed_ms=8,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="Frontal, 200m (longe), dia",
+    ),
+
+    # ── Iluminacao — frontal, ceu limpo ───────────────────────────────────
+    ApproachScenario(
+        name="az000_dawn",
         distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DAWN,
-        description="Amanhecer — iluminação lateral baixa",
+        description="Frontal, amanhecer (06h)",
     ),
     ApproachScenario(
-        name="frontal_clear_dusk",
+        name="az000_dusk",
         distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_DUSK,
-        description="Entardecer — drone contra-luz",
+        description="Frontal, entardecer (18h30)",
     ),
     ApproachScenario(
-        name="frontal_clear_night",
+        name="az000_night",
         distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
         weather=_CLEAR, time_of_day=_NIGHT,
-        description="Noite — sem iluminação natural",
+        description="Frontal, noite (02h)",
     ),
 
-    # ── Condições climáticas adversas ────────────────────────────────────────
+    # ── Iluminacao + angulo ───────────────────────────────────────────────
     ApproachScenario(
-        name="frontal_light_rain",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_LIGHT_RAIN, time_of_day=_DAY,
-        description="Chuva leve (Rain=0.3)",
+        name="az030_dawn",
+        distance_m=100, azimuth_deg=30, altitude_offset_m=0, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DAWN,
+        description="30 deg dir, amanhecer",
     ),
     ApproachScenario(
-        name="frontal_heavy_rain",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_HEAVY_RAIN, time_of_day=_DAY,
-        description="Chuva forte (Rain=1.0) — visibilidade muito reduzida",
-    ),
-    ApproachScenario(
-        name="frontal_fog",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_FOG, time_of_day=_DAY,
-        description="Neblina densa (Fog=0.6)",
-    ),
-    ApproachScenario(
-        name="frontal_dust",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_DUST, time_of_day=_DAY,
-        description="Tempestade de poeira (Dust=0.5)",
-    ),
-    ApproachScenario(
-        name="frontal_snow",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_SNOW, time_of_day=_DAY,
-        description="Neve moderada (Snow=0.7)",
+        name="az330_dusk",
+        distance_m=100, azimuth_deg=330, altitude_offset_m=0, speed_ms=5,
+        weather=_CLEAR, time_of_day=_DUSK,
+        description="30 deg esq, entardecer",
     ),
 
-    # ── Vento ─────────────────────────────────────────────────────────────────
+    # ── Combinados realisticos ────────────────────────────────────────────
     ApproachScenario(
-        name="frontal_crosswind_E10",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_CLEAR, wind_ned=(0.0, 10.0, 0.0), time_of_day=_DAY,
-        description="Vento cruzado leste a 10 m/s — deriva lateral",
+        name="az015_up10_v10_dawn",
+        distance_m=150, azimuth_deg=15, altitude_offset_m=10, speed_ms=10,
+        weather=_CLEAR, time_of_day=_DAWN,
+        description="15 deg dir, 10m acima, 10m/s, 150m, amanhecer",
     ),
     ApproachScenario(
-        name="frontal_headwind_N15",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=8,
-        weather=_CLEAR, wind_ned=(15.0, 0.0, 0.0), time_of_day=_DAY,
-        description="Vento de cauda norte 15 m/s (empurra o intruso)",
-    ),
-
-    # ── Cenários combinados / worst-case ─────────────────────────────────────
-    ApproachScenario(
-        name="rainy_night",
-        distance_m=100, azimuth_deg=0, altitude_offset_m=0, speed_ms=5,
-        weather=_LIGHT_RAIN, time_of_day=_NIGHT,
-        description="Chuva leve à noite — condição difícil combinada",
+        name="az345_dn10_v10_dusk",
+        distance_m=150, azimuth_deg=345, altitude_offset_m=-10, speed_ms=10,
+        weather=_CLEAR, time_of_day=_DUSK,
+        description="15 deg esq, 10m abaixo, 10m/s, 150m, entardecer",
     ),
     ApproachScenario(
-        name="worst_case",
-        distance_m=100, azimuth_deg=45, altitude_offset_m=15, speed_ms=15,
-        weather=_RAIN_FOG, wind_ned=(5.0, 8.0, 0.0),
-        time_of_day=_NIGHT,
-        description="Pior caso: curto alcance, diagonal, alta velocidade, chuva+neblina, noite",
+        name="az030_up20_v15_day",
+        distance_m=200, azimuth_deg=30, altitude_offset_m=20, speed_ms=15,
+        weather=_CLEAR, time_of_day=_DAY,
+        description="30 deg dir, 20m acima, 15m/s, 200m, dia",
+    ),
+    ApproachScenario(
+        name="az000_up10_v03_night",
+        distance_m=100, azimuth_deg=0, altitude_offset_m=10, speed_ms=3,
+        weather=_CLEAR, time_of_day=_NIGHT,
+        description="Frontal, 10m acima, 3m/s, noite (furtivo)",
     ),
 ]
 
