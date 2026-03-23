@@ -23,3 +23,7 @@ Thumbs.db
 *.avi
 *.mp4
 capture_*.png
+dataset_all_modalities/*
+dataset_all_modalities/
+dataset_complete_all_modalities/*
+

@@ -1,0 +1,130 @@
+{
+  "SettingsVersion": 2.0,
+  "SimMode": "Multirotor",
+  "ViewMode": "",
+  "ClockSpeed": 5.0,
+  "Vehicles": {
+    "Observer": {
+      "VehicleType": "SimpleFlight",
+      "X": 0,
+      "Y": 0,
+      "Z": -50,
+      "Yaw": 0,
+      "Cameras": {
+        "front_center": {
+          "CaptureSettings": [
+            { "ImageType": 0, "Width": 1280, "Height": 960, "FOV_Degrees": 120, "AutoExposureSpeed": 100, "MotionBlurAmount": 0 },
+            { "ImageType": 1, "Width": 1280, "Height": 960, "FOV_Degrees": 120 },
+            { "ImageType": 5, "Width": 1280, "Height": 960, "FOV_Degrees": 120 }
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        },
+        "front_medium": {
+          "CaptureSettings": [
+            { "ImageType": 0, "Width": 1280, "Height": 960, "FOV_Degrees": 90, "AutoExposureSpeed": 100, "MotionBlurAmount": 0 },
+            { "ImageType": 1, "Width": 1280, "Height": 960, "FOV_Degrees": 90 },
+            { "ImageType": 5, "Width": 1280, "Height": 960, "FOV_Degrees": 90 }
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        },
+        "front_narrow_hd": {
+          "CaptureSettings": [
+            { "ImageType": 0, "Width": 1920, "Height": 1080, "FOV_Degrees": 65, "AutoExposureSpeed": 100, "MotionBlurAmount": 0 },
+            { "ImageType": 1, "Width": 1920, "Height": 1080, "FOV_Degrees": 65 },
+            { "ImageType": 5, "Width": 1920, "Height": 1080, "FOV_Degrees": 65 }
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        },
+        "front_lowcost_640": {
+          "CaptureSettings": [
+            { "ImageType": 0, "Width": 640, "Height": 480, "FOV_Degrees": 78, "AutoExposureSpeed": 100, "MotionBlurAmount": 0 },
+            { "ImageType": 1, "Width": 640, "Height": 480, "FOV_Degrees": 78 },
+            { "ImageType": 5, "Width": 640, "Height": 480, "FOV_Degrees": 78 }
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        }
+      },
+      "Sensors": {
+        "LidarVLP16": {
+          "SensorType": 6,
+          "Enabled": true,
+          "NumberOfChannels": 16,
+          "Range": 100,
+          "RotationsPerSecond": 10,
+          "MeasurementsPerCycle": 1875,
+          "VerticalFOVUpper": 15,
+          "VerticalFOVLower": -15,
+          "HorizontalFOVStart": 0,
+          "HorizontalFOVEnd": 360,
+          "X": 0, "Y": 0, "Z": -0.2,
+          "Roll": 0, "Pitch": 0, "Yaw": 0,
+          "DrawDebugPoints": false
+        },
+        "LidarOS128": {
+          "SensorType": 6,
+          "Enabled": true,
+          "NumberOfChannels": 128,
+          "Range": 120,
+          "RotationsPerSecond": 10,
+          "MeasurementsPerCycle": 2048,
+          "VerticalFOVUpper": 22.5,
+          "VerticalFOVLower": -22.5,
+          "HorizontalFOVStart": 0,
+          "HorizontalFOVEnd": 360,
+          "X": 0, "Y": 0, "Z": -0.2,
+          "Roll": 0, "Pitch": 0, "Yaw": 0,
+          "DrawDebugPoints": false
+        },
+        "RadarCSM": {
+          "SensorType": 7,
+          "Enabled": true,
+          "SenseActive": true,
+          "SensePassive": false,
+          "NumberOfTraces": 5000,
+          "MeasurementFrequency": 15,
+          "SensorDiameter": 0.075,
+          "SensorLowerAzimuthLimit": -180,
+          "SensorUpperAzimuthLimit": 180,
+          "SensorLowerElevationLimit": -30,
+          "SensorUpperElevationLimit": 30,
+          "ReflectionOpeningAngle": 10,
+          "ReflectionLimit": 3,
+          "ReflectionDistanceLimit": 0.5,
+          "AttenuationPerDistance": 0.1,
+          "AttenuationPerReflection": 6.0,
+          "AttenuationLimit": -40,
+          "DistanceLimit": 200,
+          "X": 0, "Y": 0, "Z": -0.15,
+          "Roll": 0, "Pitch": 0, "Yaw": 0,
+          "DrawReflectedPoints": false,
+          "DrawSensor": false
+        }
+      }
+    },
+    "Drone1": {
+      "VehicleType": "SimpleFlight",
+      "X": 100,
+      "Y": 0,
+      "Z": -50,
+      "Yaw": 180,
+      "Cameras": {
+        "front_center": {
+          "CaptureSettings": [
+            { "ImageType": 0, "Width": 1280, "Height": 960, "FOV_Degrees": 120, "AutoExposureSpeed": 100, "MotionBlurAmount": 0 }
+          ],
+          "X": 0.5, "Y": 0, "Z": -0.1,
+          "Pitch": 0, "Roll": 0, "Yaw": 0
+        }
+      }
+    }
+  },
+  "SubWindows": [
+    { "WindowID": 0, "ImageType": 0, "CameraName": "front_center", "VehicleName": "Observer", "Visible": true },
+    { "WindowID": 1, "ImageType": 0, "CameraName": "front_medium", "VehicleName": "Observer", "Visible": false },
+    { "WindowID": 2, "ImageType": 0, "CameraName": "front_narrow_hd", "VehicleName": "Observer", "Visible": false }
+  ]
+}
