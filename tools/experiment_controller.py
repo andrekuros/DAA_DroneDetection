@@ -102,6 +102,7 @@ class ControllerConfig:
     enable_lidar_vlp16: bool    = False                # captura Lidar VLP-16 (16ch, 100m)
     enable_lidar_os128: bool    = False                # captura Lidar OS1-128 (128ch, 120m)
     enable_radar: bool          = False                # captura Radar CSM (Echo sensor, 200m)
+    camera_names: list[str] | None = None              # lista de cameras para batch (None = usa camera_name)
 
     def __post_init__(self):
         if self.image_types is None:
@@ -531,6 +532,16 @@ class ExperimentController:
         hx, hy, _ = self._home_offsets.get(vehicle_name, (0.0, 0.0, 0.0))
         return (lx + hx, ly + hy, lz)
 
+    def _print_progress(self, done: int, total: int):
+        """Barra de progresso simples no terminal."""
+        if total <= 0:
+            return
+        width = 30
+        ratio = max(0.0, min(1.0, done / total))
+        filled = int(width * ratio)
+        bar = "#" * filled + "-" * (width - filled)
+        print(f"[{bar}] {done}/{total} ({ratio*100:5.1f}%)")
+
     def _to_local(self, vehicle_name: str, global_xyz: tuple) -> tuple:
         """Converte coordenadas globais NED para o frame local do veiculo
         (necessario para moveToPositionAsync). Apenas XY tem offset."""
@@ -623,6 +634,9 @@ class ExperimentController:
         telemetry_rows = []
         frame_idx = 0
         last_capture = time.perf_counter()
+        stall_count = 0
+        prev_rel_dot = None
+        prev_dist = None
 
         print(f"  -> Capturando {len(self.cfg.image_types)} tipo(s) de imagem...")
 
@@ -696,6 +710,21 @@ class ExperimentController:
             if rel_dot < -cfg.stop_distance_m:
                 print(f"  -> Intruso passou {abs(rel_dot):.1f}m atras do observador. Proximo cenario.")
                 break
+
+            # Anti-stall: evita cenarios presos (ex.: rel_dot/dist quase constantes por muito tempo)
+            if prev_rel_dot is not None and prev_dist is not None:
+                rel_delta = abs(rel_dot - prev_rel_dot)
+                dist_delta = abs(dist - prev_dist)
+                if rel_delta < 0.05 and dist_delta < 0.05:
+                    stall_count += 1
+                else:
+                    stall_count = 0
+            prev_rel_dot = rel_dot
+            prev_dist = dist
+
+            if stall_count >= 120:  # ~12s com capture_interval=0.1
+                print("  [AVISO] Cenario aparenta travado (movimento estagnado). Encerrando cenario.")
+                break
             # Limite de frames
             if cfg.max_frames is not None and frame_idx >= cfg.max_frames:
                 print(f"  -> Limite de {cfg.max_frames} frames. Encerrando cenario.")
@@ -747,25 +776,41 @@ class ExperimentController:
     # ── Execução batch ────────────────────────────────────────────────────────
 
     def run_all(self, scenarios: list[ApproachScenario]):
-        """Executa todos os cenários em sequência."""
-        total = len(scenarios)
-        print(f"\n[INFO] Iniciando {total} cenario(s)...")
-        for i, scenario in enumerate(scenarios, 1):
-            try:
-                self.run_scenario(scenario, run_idx=i)
-            except KeyboardInterrupt:
-                print("\n[INTERROMPIDO] Encerrando experimento.")
-                break
-            except Exception as e:
-                print(f"[ERRO] Cenario '{scenario.name}': {e}")
-                # Tenta recuperar sem reset (que mata a conexao)
-                for v_name in set(filter(None, [self.cfg.vehicle_name, self.cfg.observer_vehicle_name])):
-                    try:
-                        self.client.enableApiControl(True, vehicle_name=v_name)
-                        self.client.hoverAsync(vehicle_name=v_name).join()
-                    except Exception:
-                        pass
-        print(f"\n[CONCLUIDO] {total} cenario(s) | Dataset: {self.cfg.output_dir.resolve()}")
+        """Executa todos os cenários em sequência (opcionalmente para múltiplas câmeras)."""
+        camera_names = self.cfg.camera_names or [self.cfg.camera_name]
+        original_output_dir = self.cfg.output_dir
+        total = len(scenarios) * len(camera_names)
+        done = 0
+        print(f"\n[INFO] Iniciando {len(scenarios)} cenario(s) x {len(camera_names)} camera(s) = {total} execucoes...")
+        self._print_progress(done, total)
+
+        for cam in camera_names:
+            self.cfg.camera_name = cam
+            self.cfg.output_dir = original_output_dir / cam
+            self.cfg.output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"\n[INFO] Camera: {cam} | Saida: {self.cfg.output_dir}")
+
+            for i, scenario in enumerate(scenarios, 1):
+                try:
+                    self.run_scenario(scenario, run_idx=i)
+                except KeyboardInterrupt:
+                    print("\n[INTERROMPIDO] Encerrando experimento.")
+                    return
+                except Exception as e:
+                    print(f"[ERRO] Cenario '{scenario.name}' (camera {cam}): {e}")
+                    # Tenta recuperar sem reset (que mata a conexao)
+                    for v_name in set(filter(None, [self.cfg.vehicle_name, self.cfg.observer_vehicle_name])):
+                        try:
+                            self.client.enableApiControl(True, vehicle_name=v_name)
+                            self.client.hoverAsync(vehicle_name=v_name).join()
+                        except Exception:
+                            pass
+                finally:
+                    done += 1
+                    self._print_progress(done, total)
+
+        self.cfg.output_dir = original_output_dir
+        print(f"\n[CONCLUIDO] {done}/{total} execucoes | Dataset: {original_output_dir.resolve()}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -843,6 +888,10 @@ def parse_args():
     p.add_argument(
         "--camera", type=str, default="front_center",
         help="Nome da câmera de captura (padrão: front_center).",
+    )
+    p.add_argument(
+        "--cameras", nargs="+", type=str, default=None,
+        help="Lista de câmeras para executar em batch (ex: front_center front_narrow_hd).",
     )
     p.add_argument(
         "--ip", type=str, default="127.0.0.1",
@@ -941,6 +990,7 @@ def main():
         enable_lidar_vlp16=args.lidar_vlp16,
         enable_lidar_os128=args.lidar_os128,
         enable_radar=args.radar,
+        camera_names=args.cameras,
     )
 
     controller = ExperimentController(cfg)
