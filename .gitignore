@@ -23,3 +23,9 @@ Thumbs.db
 *.avi
 *.mp4
 capture_*.png
+dataset_yolo/*
+runs/*
+data/*
+dataset_complete_all_modalities.zip
+dataset_complete_all_modalities/*
+

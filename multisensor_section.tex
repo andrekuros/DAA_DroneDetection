@@ -1,0 +1,249 @@
+\subsection{Multi-Sensor Simulation Campaign for Method Development}
+\label{sec:multisensor-benchmark}
+
+To complement the strategic (MSLA) and tactical (HTLV/DAIDALUS) analyses, we conducted a synchronized multi-modal simulation campaign in Cosys-AirSim to quantify frame-level detectability under identical encounter conditions. For air traffic authorities and ATC-oriented stakeholders, this section is intended as a method-development evidence package: it helps clarify applicability, practical constraints, and integration trade-offs for non-cooperative intruder detection in ABDAA-style concepts. The results are therefore indicative and exploratory, not definitive operational performance claims.
+
+\subsubsection{Objective and evaluation questions}
+The campaign addresses three method-oriented operational questions:
+\begin{enumerate}
+  \item Which sensor tends to detect first under identical run/frame conditions?
+  \item How does detection probability vary with intruder distance?
+  \item What is the trade-off between detection availability and range consistency?
+\end{enumerate}
+These questions are used to structure future validation phases and higher-fidelity UTM-oriented evaluations, rather than to claim readiness for direct operational deployment.
+
+\subsubsection{Experimental setup and reproducibility}
+\begin{itemize}
+  \item \textbf{Simulation environment}: Cosys-AirSim multirotor stack used as a technical campaign platform (not an asserted final operational solution).
+  \item \textbf{Controller}: \texttt{tools/experiment\_controller.py} with synchronized capture.
+  \item \textbf{Runs}: 29 encounter runs (e.g.\ \texttt{run\_002\_az015\_day}, consistent naming across exports).
+  \item \textbf{RGB image suites (current \texttt{data/} layout)}: four front-facing camera configurations, each with YOLO labels under \texttt{train/valid/test}:
+  \texttt{front\_center}, \texttt{front\_lowcost\_640}, \texttt{front\_medium}, \texttt{front\_narrow\_hd}.
+  Per-camera image counts differ (not every frame is exported for every sensor package).
+  \item \textbf{RGB ground truth for detection scoring}: YOLO-format box labels in \texttt{labels/} (true positive = IoU $\geq$ threshold vs.\ best predicted box).
+  \item \textbf{Cross-sensor distance reference}: \texttt{telemetry.csv}, field \texttt{dist\_xy\_m}. In the refreshed campaign, all aligned LiDAR/radar metrics were regenerated from \texttt{dataset\_complete\_all\_modalities/dataset\_complete\_all\_modalities/front\_center}.
+  \item \textbf{Sensors in the full benchmark}: RGB + YOLOv8, LiDAR OS128, LiDAR VLP16, Echo Radar (CSM profile).
+\end{itemize}
+
+Full simulator layout per run (when exporting all modalities):
+\begin{center}
+\texttt{rgb/ seg/ depth/ lidar\_os128/ lidar\_vlp16/ radar/ telemetry.csv}
+\end{center}
+
+\paragraph{Implementation artifacts}
+\begin{itemize}
+  \item RGB training/inference: \texttt{tools/generate\_yolo\_labels.py}, \texttt{tools/train\_yolo.py}, \texttt{tools/detect\_rgb.py} (single-stream), \texttt{tools/detect\_rgb\_cameras.py} (all cameras under \texttt{data/}).
+  \item LiDAR detection: \texttt{tools/detect\_lidar.py}.
+  \item Radar detection: \texttt{tools/detect\_radar.py}.
+  \item Cross-sensor aggregation: \texttt{tools/compare\_sensors.py}.
+  \item Visualization helper: \texttt{tools/vis\_sensors.py}.
+\end{itemize}
+
+\begin{figure}[ht]
+  \centering
+  % \includegraphics[width=0.9\linewidth]{figures/pipeline_multisensor.pdf}
+  \fbox{\parbox{0.9\linewidth}{\centering Placeholder: end-to-end pipeline diagram (scenario generation $\rightarrow$ synchronized sensor capture $\rightarrow$ per-sensor detection $\rightarrow$ cross-sensor comparison).}}
+  \caption{Multi-sensor experimental pipeline used in the benchmark.}
+  \label{fig:multisensor-pipeline}
+\end{figure}
+
+\subsubsection{RGB multi-camera evaluation (labeled image suite)}
+\label{sec:rgb-multicam}
+We evaluated YOLOv8 on each camera folder independently (same run/frame naming convention in filenames). Table~\ref{tab:rgb-by-camera} reports frame-level any-detection rate and true-positive rate on frames with YOLO ground-truth boxes (TP criterion: IoU against the best prediction above threshold). This refresh used pretrained \texttt{yolov8n.pt}; replace with project-trained weights for domain-matched reporting.
+
+\begin{table}[ht]
+  \centering
+  \caption{RGB YOLO performance by camera package (29 runs; per-camera image counts).}
+  \label{tab:rgb-by-camera}
+  \begin{tabular}{lrrrr}
+    \hline
+    \textbf{Camera} & \textbf{Images} & \textbf{Any det.\ (\%)} & \textbf{w/\ GT label} & \textbf{TP (IoU) (\%)} \\
+    \hline
+    \texttt{front\_center}      & 640 & 5.0  & 640 & 0.0 \\
+    \texttt{front\_lowcost\_640}& 911 & 7.6  & 436 & 14.7 \\
+    \texttt{front\_medium}      & 582 & 7.2  & 378 & 10.3 \\
+    \texttt{front\_narrow\_hd}  & 448 & 8.7  & 247 & 15.4 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\noindent Pooled over all camera rows in the merged export: 2{,}581 image evaluations; 182 (7.1\%) with any detection; among 1{,}701 rows with GT labels, 141 true positives (8.3\%).
+
+\begin{table}[ht]
+  \centering
+  \caption{RGB any-detection and TP-on-labeled rates by lighting tag in run name (row-wise over all four cameras).}
+  \label{tab:rgb-by-light-multicam}
+  \begin{tabular}{lrrrr}
+    \hline
+    \textbf{Condition} & \textbf{Rows} & \textbf{Any det.\ (\%)} & \textbf{w/\ GT} & \textbf{TP (\% of labeled)} \\
+    \hline
+    Day   & 1829 & 8.0 & 1130 & 9.8 \\
+    Dawn  &  247 & 2.0 &  187 & 2.1 \\
+    Dusk  &  246 & 7.7 &  165 & 9.7 \\
+    Night &  259 & 4.6 &  219 & 4.6 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsubsection{Cross-sensor detection by distance band (refreshed complete-modalities run set)}
+Table~\ref{tab:det-rate-distance} summarizes per-band detection rates using identical \texttt{(run,\,frame)} keys from the refreshed complete-modalities export (640 aligned frames, 29 runs). For strict alignment, the RGB column uses \texttt{front\_narrow\_hd} as the primary camera in \texttt{tools/compare\_sensors.py}.
+
+\begin{table}[ht]
+  \centering
+  \caption{Detection rate (\%) by distance band --- refreshed aligned benchmark (640 frames).}
+  \label{tab:det-rate-distance}
+  \begin{tabular}{lcccc}
+    \hline
+    \textbf{Distance band (m)} & \textbf{RGB YOLO} & \textbf{LiDAR OS128} & \textbf{LiDAR VLP16} & \textbf{Radar Echo} \\
+    \hline
+    0--10   &  7.5 & 77.6 & 29.9 & 100.0 \\
+    10--25  &  2.8 & 77.1 & 32.1 & 100.0 \\
+    25--50  & 10.2 & 67.7 & 16.5 & 100.0 \\
+    50--100 &  6.7 & 55.4 & 11.2 & 100.0 \\
+    100--150&  1.2 & 58.5 &  0.0 & 100.0 \\
+    150--250&  0.0 &  6.7 &  0.0 & 100.0 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Global frame-level detection rates on the same 640-frame synchronized subset:
+\begin{itemize}
+  \item RGB YOLO (\texttt{front\_narrow\_hd} aligned stream): 6.1\% (39/640)
+  \item LiDAR OS128: 63.1\% (404/640)
+  \item LiDAR VLP16: 16.1\% (103/640)
+  \item Radar Echo: 100.0\% (640/640)
+\end{itemize}
+
+\paragraph{Important interpretation note}
+The radar result above corresponds to a \emph{return-presence} detector (valid return in frame), i.e., a high-availability cueing signal. It should not be interpreted as target-class certainty on its own. In this baseline stage, radar prioritizes recall and early warning support, while confirmation and refinement are expected from fusion with LiDAR/vision and SUM/VISA logic.
+More broadly, none of the rates in this section should be interpreted as certification-grade thresholds or direct field-equivalent performance; they are campaign outcomes to support model refinement, sensing strategy selection, and next-step test design.
+
+\subsubsection{Condition-level performance (day/dawn/dusk/night)}
+Table~\ref{tab:det-rate-light} reports the refreshed 640-frame synchronized benchmark segmented by lighting condition.
+
+\begin{table}[ht]
+  \centering
+  \caption{Detection rate (\%) by lighting condition (640-frame refreshed synchronized benchmark).}
+  \label{tab:det-rate-light}
+  \begin{tabular}{lccccc}
+    \hline
+    \textbf{Condition} & \textbf{Frames} & \textbf{RGB} & \textbf{OS128} & \textbf{VLP16} & \textbf{Radar} \\
+    \hline
+    Day   & 468 & 6.6 & 62.0 & 15.6 & 100.0 \\
+    Dawn  &  55 & 0.0 & 58.2 & 14.5 & 100.0 \\
+    Dusk  &  54 & 7.4 & 75.9 & 18.5 & 100.0 \\
+    Night &  63 & 4.8 & 65.1 & 19.0 & 100.0 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsubsection{Earliest detection and warning relevance}
+First-detection winner per run on the refreshed synchronized export (29 runs):
+\begin{itemize}
+  \item Radar first: 19.1/29 (tie-shared counting)
+  \item OS128 first: 9.1/29 (tie-shared counting)
+  \item RGB first: 0.6/29 (tie-shared counting)
+  \item VLP16 first: 0.2/29 (tie-shared counting)
+\end{itemize}
+
+Mean distance at first-detection win:
+\begin{itemize}
+  \item Radar: mean 116.9\,m, median 117.1\,m (n=29)
+  \item OS128: mean 113.2\,m, median 117.1\,m (n=19)
+  \item RGB: mean 72.8\,m, median 72.8\,m (n=2)
+  \item VLP16: mean 24.6\,m, median 24.6\,m (n=1)
+\end{itemize}
+
+These results indicate that radar and high-density LiDAR tend to provide earlier tactical cueing in the evaluated encounter family, while RGB contributes stronger semantic information mainly in favorable close-/mid-range visual conditions. The interpretation remains bounded to the explored simulation campaign envelope and should be treated as directional evidence.
+
+\begin{figure}[ht]
+  \centering
+  % \includegraphics[width=0.85\linewidth]{figures/first_detection_by_run.pdf}
+  \fbox{\parbox{0.85\linewidth}{\centering Placeholder: first-detection frame index and first-detection distance by sensor/run.}}
+  \caption{Earliest detection comparison among modalities.}
+  \label{fig:first-detection}
+\end{figure}
+
+\subsubsection{What worked and current limitations}
+\paragraph{What worked}
+\begin{itemize}
+  \item Synchronized multi-modal acquisition and replayable evaluation.
+  \item Reproducible per-sensor and cross-sensor scripts.
+  \item Coherent complementarity pattern consistent with ABDAA assumptions.
+\end{itemize}
+
+\paragraph{Current limitations}
+\begin{enumerate}
+  \item Radar detector is baseline-level (return presence), not class-discriminative.
+  \item LiDAR detector is heuristic clustering, not yet trained/class-aware against clutter.
+  \item RGB model/data domain can be expanded for small-target long-range and adverse-weather robustness.
+  \item Encounter family is mostly frontal/near-frontal; broader angular and occlusion coverage is still needed.
+  \item Results are not intended as final operational acceptance evidence; additional high-fidelity and mixed-reality/field-linked validation is required for authority-facing assurance.
+\end{enumerate}
+
+\subsubsection{Implication for ABDAA}
+The refreshed campaign supports the hybrid ABDAA rationale as a development and evaluation pathway:
+\begin{itemize}
+  \item Radar for high-availability early cueing and continuity;
+  \item OS128 LiDAR for stronger geometric observability in tactical distances;
+  \item RGB for semantic confirmation and visual interpretability;
+  \item SUM/VISA + DAIDALUS to absorb uncertainty and maintain stable, actionable RWC guidance.
+\end{itemize}
+For authorities and ATC-focused readers, the practical value is not a final ranking of sensors, but a transparent basis to prioritize future UTM evaluation campaigns with broader scenarios, stronger fidelity controls, and progressively stricter validation criteria.
+
+\subsection*{Appendix A --- Technical framework used in the benchmark}
+\addcontentsline{toc}{subsection}{Appendix A --- Technical framework used in the benchmark}
+\label{app:technical-framework}
+
+\paragraph{A.1 Data contracts}
+The technical details in Appendix A document reproducibility-critical tooling and data contracts; they should be read as implementation support for experimentation, not as endorsement of a single final platform architecture.
+\begin{itemize}
+  \item \textbf{Telemetry}: frame-indexed reference state, including \texttt{dist\_xy\_m}.
+  \item \textbf{RGB CSV}: \texttt{camera, split, run, frame, detected, tp, iou, confidence, has\_gt\_label, gt\_distance\_m} (multi-camera export) or legacy single-stream columns via \texttt{detect\_rgb.py}.
+  \item \textbf{LiDAR CSV}: \texttt{run, frame, detected, est\_range\_m, n\_points, gt\_distance\_m, range\_error\_m}.
+  \item \textbf{Radar CSV}: \texttt{run, frame, detected, est\_range\_m, n\_returns, gt\_distance\_m, range\_error\_m}.
+\end{itemize}
+
+\paragraph{A.2 Algorithmic baseline choices}
+\begin{itemize}
+  \item \textbf{RGB}: YOLOv8 object detection trained on simulation-derived labels.
+  \item \textbf{LiDAR}: DBSCAN clustering after zero/near-body filtering.
+  \item \textbf{Radar}: valid-return gating and nearest-return range proxy.
+  \item \textbf{Comparison}: strict key matching by (\texttt{run}, \texttt{frame}) for same-condition evaluation.
+\end{itemize}
+
+\paragraph{A.3 Reproducibility procedure}
+\begin{enumerate}
+  \item Generate synchronized runs with all sensors enabled.
+  \item Run:
+  \begin{itemize}
+    \item \texttt{python tools/detect\_rgb\_cameras.py --data-root data --model <weights>.pt [--sim-dataset dataset]}
+    \item (optional single stream) \texttt{python tools/detect\_rgb.py ...}
+    \item \texttt{python tools/detect\_lidar.py --sensor os128}
+    \item \texttt{python tools/detect\_lidar.py --sensor vlp16}
+    \item \texttt{python tools/detect\_radar.py}
+    \item \texttt{python tools/compare\_sensors.py [--primary-rgb-camera front\_narrow\_hd]}
+  \end{itemize}
+  \item Export representative figures from \texttt{tools/vis\_sensors.py}.
+\end{enumerate}
+
+\paragraph{A.4 Recommended next-step hardening}
+\begin{itemize}
+  \item No-intruder clutter campaign for false-alert quantification.
+  \item TTC-at-first-detection metric for direct HITL margin analysis.
+  \item Angular sweep and occlusion stress tests.
+  \item Simple fusion baselines (OR/AND gating), then probabilistic temporal fusion.
+\end{itemize}
+
+\subsubsection*{Suggested citations (to align with report context)}
+\begin{itemize}
+  \item RTCA DO-365B (RWC/DAA framework)
+  \item ASTM F3442/F3442M (sUAS DAA performance)
+  \item NASA DAIDALUS documentation
+  \item Ultralytics YOLOv8 documentation
+  \item DBSCAN: Ester et al. (1996)
+  \item mmWave FMCW radar references (e.g., TI app notes)
+  \item LiDAR weather degradation studies (fog/rain scattering)
+  \item HITL alerting and alert-fatigue references already used in Section 2.3.6
+\end{itemize}
+

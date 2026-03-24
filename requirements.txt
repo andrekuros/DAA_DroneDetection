@@ -4,3 +4,4 @@ opencv-python
 mss
 pywin32
 numpy
+ultralytics>=8.0
