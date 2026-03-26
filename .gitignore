@@ -29,3 +29,14 @@ data/*
 dataset_complete_all_modalities.zip
 dataset_complete_all_modalities/*
 
+dataset_exp30_frontcenter_yolo/
+dataset_yolo/*
+dataset_yolo_exp30_frontcenter/
+dataset_exp30_frontcenter_yolo/
+dataset_yolo_exp30_frontcenter/
+dataset_exp30_multicam/
+
+dataset_exp30_yolo_narrow_hd/
+dataset_exp30_multicam_yolo/
+dataset_exp30_yolo_medium/
+dataset_exp30_yolo_lowcost640/

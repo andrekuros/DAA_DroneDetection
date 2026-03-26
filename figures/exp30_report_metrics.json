@@ -1,0 +1,84 @@
+{
+  "runs": {
+    "Multicam (4 c\u00e2meras)": {
+      "epoch": 100,
+      "precision": 0.9521,
+      "recall": 0.94118,
+      "mAP50": 0.96366,
+      "mAP50_95": 0.73116
+    },
+    "Narrow HD": {
+      "epoch": 100,
+      "precision": 0.96329,
+      "recall": 0.87805,
+      "mAP50": 0.90883,
+      "mAP50_95": 0.66304
+    },
+    "Medium": {
+      "epoch": 100,
+      "precision": 0.9387,
+      "recall": 0.92593,
+      "mAP50": 0.95556,
+      "mAP50_95": 0.67207
+    },
+    "Lowcost 640": {
+      "epoch": 94,
+      "precision": 0.97348,
+      "recall": 0.99225,
+      "mAP50": 0.99447,
+      "mAP50_95": 0.6892
+    }
+  },
+  "dataset_splits": {
+    "Multicam (4 c\u00e2meras)": {
+      "train": 680,
+      "val": 170
+    },
+    "Narrow HD": {
+      "train": 162,
+      "val": 41
+    },
+    "Medium": {
+      "train": 215,
+      "val": 54
+    },
+    "Lowcost 640": {
+      "train": 148,
+      "val": 37
+    }
+  },
+  "crossval_multicam_best": [
+    {
+      "dataset": "dataset_exp30_multicam_yolo/dataset.yaml",
+      "imgsz": 960,
+      "precision": 0.963910686359478,
+      "recall": 0.9529411764705882,
+      "mAP50": 0.9719793691865177,
+      "mAP50_95": 0.7338033756569695
+    },
+    {
+      "dataset": "dataset_exp30_yolo_narrow_hd/dataset.yaml",
+      "imgsz": 960,
+      "precision": 0.9726131090845612,
+      "recall": 0.8663575926984275,
+      "mAP50": 0.9170994594594595,
+      "mAP50_95": 0.6995166921382363
+    },
+    {
+      "dataset": "dataset_exp30_yolo_medium/dataset.yaml",
+      "imgsz": 960,
+      "precision": 0.9284069424856788,
+      "recall": 0.9606175132217157,
+      "mAP50": 0.9672660866910865,
+      "mAP50_95": 0.7070986882011859
+    },
+    {
+      "dataset": "dataset_exp30_yolo_lowcost640/dataset.yaml",
+      "imgsz": 640,
+      "precision": 0.9908091335843374,
+      "recall": 1.0,
+      "mAP50": 0.995,
+      "mAP50_95": 0.7414825855013701
+    }
+  ]
+}
