@@ -1,0 +1,44 @@
+{
+  "campaign": "campaign_wsc250",
+  "n_runs": 3,
+  "vo_sigma_m": 0.12,
+  "err_ekf_final_median_m": 87.73092684323134,
+  "err_fg_final_median_m": 3.0729340867962582,
+  "improvement_median_x": 28.549563500301684,
+  "runs": [
+    {
+      "n_keyframes": 66,
+      "cost": 178.67639237370182,
+      "err_fg_final_m": 3.0729340867962582,
+      "err_ekf_final_m": 69.01261728646688,
+      "err_fg_mean_m": 2.006206955587606,
+      "err_ekf_mean_m": 20.91319910650052,
+      "improvement_final_x": 22.45821593863642,
+      "vo_sigma_m": 0.12,
+      "run": "denied_rep01"
+    },
+    {
+      "n_keyframes": 57,
+      "cost": 120.27902254522826,
+      "err_fg_final_m": 0.518320532460919,
+      "err_ekf_final_m": 87.73092684323134,
+      "err_fg_mean_m": 0.6222656760714939,
+      "err_ekf_mean_m": 29.386679705082553,
+      "improvement_final_x": 169.25998749595394,
+      "vo_sigma_m": 0.12,
+      "run": "denied_rep02"
+    },
+    {
+      "n_keyframes": 78,
+      "cost": 1243.732952044148,
+      "err_fg_final_m": 6.997843004197785,
+      "err_ekf_final_m": 314.82774164942373,
+      "err_fg_mean_m": 2.6376395947335816,
+      "err_ekf_mean_m": 104.13814580506842,
+      "improvement_final_x": 44.989254754724925,
+      "vo_sigma_m": 0.12,
+      "run": "denied_rep03"
+    }
+  ],
+  "note": "Visual relative-pose factors are simulated from ground truth + noise (no camera log in this campaign). IMU and baro factors use the CSV."
+}

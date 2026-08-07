@@ -1,6 +1,6 @@
 %**************************************************************************
 % WSC 2026 Poster Extended Abstract -- SEGUNDO abstract (simulacao GNSS-denied)
-% Numeros: figures/gnss_wsc250_summary.json (campaign_wsc250, alt 250 m).
+% Numeros: gnss_wsc250_summary.json + gnss_wsc250_fg_summary.json
 %**************************************************************************
 \documentclass{wscposterproc}
 
@@ -43,11 +43,12 @@ truth at $20$\,Hz.
 Because the autopilot is the real flight stack and the coupling is MAVLink
 throughout, the same scenario definition drives software- and hardware-in-the-loop
 without modification.
-We demonstrate the environment with a repeatable inertial drift baseline,
-$|e| \approx 0.15\,t^{1.92}$ over $3$ runs, and report the timing calibration
-required before such numbers can be trusted.
-The environment, not the baseline, is the contribution; absolute values are
-simulator-specific.
+We demonstrate the environment with an inertial drift baseline
+($|e| \approx 0.15\,t^{1.92}$ over $3$ runs) and by replaying a factor-graph
+smoother on the identical denied windows, reducing median terminal error from
+$88$\,m to $3.1$\,m.
+The environment, not any single estimator, is the contribution; absolute values
+are simulator-specific.
 
 \section{INTRODUCTION}
 \label{sec:intro}
@@ -75,10 +76,10 @@ hardware-in-the-loop unchanged.
 \vspace{-2mm}
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.55\textwidth]{../figures/wsc26_gnss_scene.png}
+\includegraphics[width=0.52\textwidth]{../figures/wsc26_gnss_scene.png}
 \vspace{-2mm}
-\caption{Simulated urban scene. High-rise geometry motivates GNSS-denied operation;
-demonstration flights use $250$\,m AGL so drift is not confounded by collisions.}
+\caption{Simulated urban scene. Demonstration flights use $250$\,m AGL so drift is
+not confounded by collisions with the high-rise canopy.}
 \label{fig:scene}
 \end{figure}
 \vspace{-3mm}
@@ -89,6 +90,8 @@ State estimation and control come from PX4 SITL, coupled over TCP in lockstep so
 simulator and autopilot never free-run relative to each other.
 A MAVSDK client commands the profile---arm, climb to $250$\,m, then a straight
 $250$\,m leg---and logs the EKF2 estimate against simulator truth.
+Estimate and truth are time-aligned with a measured transport delay before errors
+are formed.
 
 \textbf{GNSS revocation as a scenario variable.}
 Outages clear the estimator's GNSS fusion mask at a configured ground-truth point,
@@ -104,34 +107,31 @@ Repetitions reuse a warm estimator that has reconverged with GNSS aiding before 
 outage; fusion is restored between flights so denied windows remain independent even
 when the autopilot process is not restarted.
 
-\section{DEMONSTRATION AND OBSERVED CALIBRATION}
+\section{DEMONSTRATION}
 \label{sec:results}
 
 \vspace{-2mm}
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.68\textwidth]{../figures/gnss_wsc250_drift_law.png}
+\includegraphics[width=0.92\textwidth]{../figures/gnss_wsc250_fg.png}
 \vspace{-2mm}
-\caption{Drift after in-flight GNSS revocation: median with p05--p95 band ($N{=}3$),
-power-law fit, and GNSS-on floor.}
-\label{fig:drift}
+\caption{Left: position error after GNSS denial---EKF2 inertial baseline versus a
+factor-graph smoother on the same logs (median and p05--p95, $N{=}3$).
+Right: top view for a representative run.}
+\label{fig:fg}
 \end{figure}
 \vspace{-3mm}
 
-Over $3$ repetitions, position error during the outage grows as
-$|e| = 0.15\,t^{1.92}$ (median exponent; $R^2$ up to $0.96$), reaching $86$\,m
-(median; $66$--$308$) after about $33$\,s (Figure~\ref{fig:drift}).
-An exponent near two is consistent with twice-integrated accelerometer bias.
-At $250$\,m AGL the LiDAR still returns structure in $59$\,\% of sweeps (median
-$10$ valid points), so ranging factors remain available even when flown clear of the
-dense canopy.
-
-Estimate and truth are not sampled together: a $255$\,ms transport delay manufactured
-up to $3.4$\,m of velocity-proportional apparent error on GNSS-on flights.
-Correcting it leaves a residual floor of about $1.2$\,m median ($3.2$\,m at p95) on
-the campaign baselines, which bounds the smallest resolvable drift.
-We report both because they condition the numbers above, not because they are the
-result.
+Over $3$ repetitions, EKF2 position error during the outage grows as
+$|e| \approx 0.15\,t^{1.92}$, reaching $86$\,m median ($66$--$308$) after about
+$33$\,s---the inertial reference a navigation estimator must beat.
+As a first consumer of the logged streams, we replay a batch factor-graph smoother
+with IMU and barometric factors from the CSV plus simulated visual relative-pose
+factors (ground truth with $0.12$\,m noise), standing in for a VIO front-end until
+camera logs are wired.
+On the same denied windows the smoother cuts median terminal error from $88$\,m to
+$3.1$\,m (about $28\times$; Figure~\ref{fig:fg}), showing that the environment
+supports graded comparison of estimator structure under a controlled outage.
 
 \section{CONCLUSIONS AND ONGOING WORK}
 \label{sec:concl}
@@ -139,12 +139,11 @@ The environment supplies controllable outages, synchronized sensing, exact truth
 repeatability with a real autopilot in the loop.
 Absolute drift reflects the simulator's inertial noise model rather than a specific
 airframe.
-Ongoing work replays the logged streams through a factor-graph smoother on the same
-outage windows; extends revocation toward receiver-level urban multipath as a further
-scenario variable; and moves the same scenarios to hardware-in-the-loop unchanged,
-because the interface is MAVLink on both sides.
+Ongoing work replaces the simulated visual factors with a real image front-end on
+the same scenarios, extends revocation toward receiver-level urban multipath, and
+moves the profiles to hardware-in-the-loop unchanged over MAVLink.
 
-\enlargethispage{28mm}
+\enlargethispage{30mm}
 \vspace{-2mm}
 {\fontsize{9}{10.5}\selectfont
 \bibliographystyle{wsc}

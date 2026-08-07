@@ -55,6 +55,9 @@ _SETTINGS_CANDIDATES = [
     ROOT / "config" / "cosys_airsim_px4_settings.json",
 ]
 
+# Retornos mais proximos que isto sao ecos na propria fuselagem/helices, nao cena.
+SELF_HIT_M = 2.0
+
 
 def read_vehicle_spawns() -> dict[str, tuple[float, float, float]]:
     """
@@ -111,6 +114,11 @@ class SensorSample:
     lidar_points: int = -1
     lidar_mean_range_m: float = float("nan")
     lidar_min_range_m: float = float("nan")
+    # Alcance mediano do cone nadir: com o sensor apontado para baixo isto e a
+    # altura sobre o que esta embaixo (telhado ou rua), nao a altitude absoluta.
+    # E uma observacao independente de barometro e GNSS, entao entra no factor
+    # graph como fator de altura sempre que ha retorno.
+    lidar_agl_m: float = float("nan")
     # Colisao: numa cena urbana densa o veiculo bate em predios e props. Um impacto
     # perturba a dinamica e a IMU, contaminando justamente a deriva que medimos —
     # entao o trecho afetado precisa ser identificavel no CSV, nao descoberto depois.
@@ -140,7 +148,7 @@ class AirSimGroundTruth:
 
     vehicle_name: str = "PX4Drone"
     ip: str = "127.0.0.1"
-    lidar_name: str = "LidarStructure"
+    lidar_name: str = "LidarNadir"
     client: object | None = field(default=None, init=False)
     spawn_offset: tuple[float, float, float] = field(default=(0.0, 0.0, 0.0), init=False)
     _lidar_ok: bool = field(default=True, init=False)
@@ -310,19 +318,186 @@ class AirSimGroundTruth:
                 # distancia media desaba — medimos 7,2 m de media voando a 60 m,
                 # fisicamente impossivel. So pontos com retorno real interessam
                 # como proxy de estrutura para scan-matching.
+                # O limiar de 0,5 m era baixo demais: voando a 250 m com alcance de
+                # 80 m o solo ficava fora de alcance e o que sobrava eram ecos na
+                # propria fuselagem, a ~0,6 m. Media de 0,6 m nao e estrutura urbana,
+                # e o proprio drone. Cortar em 2 m descarta esses ecos.
                 rr = []
                 for i in range(0, n * 3, 3):
                     d = math.sqrt(pts[i] ** 2 + pts[i + 1] ** 2 + pts[i + 2] ** 2)
-                    if d > 0.5:
+                    if d > SELF_HIT_M:
                         rr.append(d)
                 s.lidar_points = len(rr)
                 if rr:
                     s.lidar_mean_range_m = sum(rr) / len(rr)
                     s.lidar_min_range_m = min(rr)
+                    # Mediana em vez de media: o cone nadir cruza bordas de telhado,
+                    # onde poucos raios caem na rua 100 m abaixo. A media desce com
+                    # esses outliers; a mediana fica na superficie dominante.
+                    rr.sort()
+                    s.lidar_agl_m = rr[len(rr) // 2]
             except Exception as e:
                 self._lidar_ok = False
                 print(f"[AVISO] LiDAR '{self.lidar_name}' indisponivel ({e}); seguindo sem ele.")
         return s
+
+
+class FrameRecorder:
+    """
+    Grava frames da camera nadir e nuvens do LiDAR durante o voo.
+
+    Roda em thread propria com um cliente RPC proprio, e nao no executor do
+    AirSimGroundTruth: capturar 1024x768 custa ordens de grandeza mais que ler
+    IMU, e serializar as duas coisas na mesma thread furaria a cadencia de 20 Hz
+    da telemetria. Cliente separado tambem evita compartilhar um socket msgpack
+    que nao e thread-safe.
+
+    Frames sao gravados em JPEG (q=90). O RPC entrega RGB cru — 2,4 MB por frame
+    a 1024x768 — e guardar isso direto encheria o disco em um voo; o JPEG cai
+    para ~100 kB sem prejudicar rastreio de features.
+
+    O indice frames.csv associa cada arquivo ao relogio de parede (mesma base do
+    telemetry.csv, o que permite juntar os dois depois) e ao ground truth do
+    instante, necessario para avaliar o VIO contra a verdade.
+    """
+
+    INDEX_FIELDS = [
+        "t_wall", "frame_file", "cloud_file",
+        "gt_x", "gt_y", "gt_z", "gt_roll", "gt_pitch", "gt_yaw",
+    ]
+
+    def __init__(
+        self,
+        out_dir: Path,
+        vehicle_name: str = "PX4Drone",
+        ip: str = "127.0.0.1",
+        camera: str = "vio_cam",
+        lidar_name: str = "LidarNadir",
+        frame_hz: float = 4.0,
+        cloud_hz: float = 2.0,
+        jpeg_quality: int = 90,
+    ):
+        self.out_dir = Path(out_dir)
+        self.frames_dir = self.out_dir / "frames"
+        self.clouds_dir = self.out_dir / "clouds"
+        self.vehicle_name = vehicle_name
+        self.ip = ip
+        self.camera = camera
+        self.lidar_name = lidar_name
+        self.frame_hz = frame_hz
+        self.cloud_hz = cloud_hz
+        self.jpeg_quality = int(jpeg_quality)
+        self.n_frames = 0
+        self.n_clouds = 0
+        self.errors = 0
+        self._stop = None
+        self._thread = None
+
+    def start(self) -> None:
+        import threading
+
+        self.frames_dir.mkdir(parents=True, exist_ok=True)
+        self.clouds_dir.mkdir(parents=True, exist_ok=True)
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="frame-rec", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._stop is not None:
+            self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=10.0)
+            self._thread = None
+
+    def _run(self) -> None:
+        import csv as _csv
+
+        import cv2
+        import numpy as np
+
+        AirSimGroundTruth._init_rpc_thread()
+        try:
+            client = airsim.MultirotorClient(ip=self.ip)
+            client.confirmConnection()
+        except Exception as e:
+            print(f"[AVISO] FrameRecorder nao conectou ({e}); voo segue sem frames.")
+            return
+
+        idx_fh = (self.out_dir / "frames.csv").open("w", newline="", encoding="utf-8")
+        idx = _csv.DictWriter(idx_fh, fieldnames=self.INDEX_FIELDS)
+        idx.writeheader()
+
+        period = 1.0 / max(self.frame_hz, 0.1)
+        cloud_every = max(1, int(round(self.frame_hz / max(self.cloud_hz, 0.1))))
+        enc = [int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality]
+        tick = 0
+        next_t = time.monotonic()
+
+        while not self._stop.is_set():
+            t_wall = time.time()
+            frame_file = cloud_file = ""
+
+            try:
+                resp = client.simGetImages(
+                    [airsim.ImageRequest(self.camera, airsim.ImageType.Scene, False, False)],
+                    vehicle_name=self.vehicle_name,
+                )
+                r = resp[0] if resp else None
+                if r is not None and r.height > 0 and len(r.image_data_uint8) > 0:
+                    buf = np.frombuffer(r.image_data_uint8, dtype=np.uint8)
+                    ch = buf.size // (r.height * r.width)
+                    img = buf.reshape(r.height, r.width, ch)[:, :, :3]
+                    frame_file = f"frames/f_{self.n_frames:06d}.jpg"
+                    cv2.imwrite(str(self.out_dir / frame_file), img, enc)
+                    self.n_frames += 1
+            except Exception:
+                self.errors += 1
+
+            if (tick % cloud_every) == 0:
+                try:
+                    ld = client.getLidarData(lidar_name=self.lidar_name,
+                                             vehicle_name=self.vehicle_name)
+                    pts = np.asarray(ld.point_cloud, dtype=np.float32)
+                    if pts.size >= 3:
+                        pts = pts.reshape(-1, 3)
+                        # Descarta raios sem retorno (0,0,0) e ecos na fuselagem antes
+                        # de gravar: a nuvem crua e majoritariamente zeros e triplicaria
+                        # o arquivo sem informacao.
+                        d = np.linalg.norm(pts, axis=1)
+                        pts = pts[d > SELF_HIT_M]
+                        if pts.size:
+                            cloud_file = f"clouds/c_{self.n_clouds:06d}.npy"
+                            np.save(self.out_dir / cloud_file, pts)
+                            self.n_clouds += 1
+                except Exception:
+                    self.errors += 1
+
+            row = {k: "" for k in self.INDEX_FIELDS}
+            row["t_wall"] = f"{t_wall:.4f}"
+            row["frame_file"] = frame_file
+            row["cloud_file"] = cloud_file
+            try:
+                k = client.simGetGroundTruthKinematics(vehicle_name=self.vehicle_name)
+                p, o = k.position, k.orientation
+                roll, pitch, yaw = airsim.to_eularian_angles(o)
+                row.update(gt_x=f"{p.x_val:.4f}", gt_y=f"{p.y_val:.4f}", gt_z=f"{p.z_val:.4f}",
+                           gt_roll=f"{roll:.6f}", gt_pitch=f"{pitch:.6f}", gt_yaw=f"{yaw:.6f}")
+            except Exception:
+                self.errors += 1
+            idx.writerow(row)
+            idx_fh.flush()
+
+            tick += 1
+            next_t += period
+            sleep_s = next_t - time.monotonic()
+            if sleep_s > 0:
+                self._stop.wait(sleep_s)
+            else:
+                # Captura mais lenta que a cadencia pedida: reancorar em vez de
+                # acumular atraso, senao o laco entra em corrida sem folga.
+                next_t = time.monotonic()
+
+        idx_fh.close()
 
 
 def main() -> None:

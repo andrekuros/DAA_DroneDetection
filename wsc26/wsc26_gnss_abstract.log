@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.8.6)  7 AUG 2026 01:11
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.8.6)  7 AUG 2026 07:20
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -411,39 +411,39 @@ Overfull \hbox (12.0pt too wide) in paragraph at lines 33--33
 <../figures/wsc26_gnss_scene.png, id=22, 1606.0pt x 903.375pt>
 File: ../figures/wsc26_gnss_scene.png Graphic file (type png)
 <use ../figures/wsc26_gnss_scene.png>
-Package pdftex.def Info: ../figures/wsc26_gnss_scene.png  used on input line 78
+Package pdftex.def Info: ../figures/wsc26_gnss_scene.png  used on input line 79
 .
-(pdftex.def)             Requested size: 258.36667pt x 145.32866pt.
+(pdftex.def)             Requested size: 244.2746pt x 137.40265pt.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 81.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 82.
 [1{C:/Users/andre/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/Users/an
 dre/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc}
 
 ]
-<../figures/gnss_wsc250_drift_law.png, id=41, 715.473pt x 354.123pt>
-File: ../figures/gnss_wsc250_drift_law.png Graphic file (type png)
-<use ../figures/gnss_wsc250_drift_law.png>
-Package pdftex.def Info: ../figures/gnss_wsc250_drift_law.png  used on input li
-ne 113.
-(pdftex.def)             Requested size: 319.42995pt x 158.10025pt.
+<../figures/gnss_wsc250_fg.png, id=41, 751.608pt x 296.307pt>
+File: ../figures/gnss_wsc250_fg.png Graphic file (type png)
+<use ../figures/gnss_wsc250_fg.png>
+Package pdftex.def Info: ../figures/gnss_wsc250_fg.png  used on input line 116.
+
+(pdftex.def)             Requested size: 432.17372pt x 170.3752pt.
 
 (wsc26_gnss_abstract.bbl) [2 <../figures/wsc26_gnss_scene.png (PNG copy)> <../f
-igures/gnss_wsc250_drift_law.png>] (wsc26_gnss_abstract.aux)
+igures/gnss_wsc250_fg.png>] (wsc26_gnss_abstract.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-12-24>
  ***********
 Package rerunfilecheck Info: File `wsc26_gnss_abstract.out' has not changed.
-(rerunfilecheck)             Checksum: E9A19960429C81F5C0A5ECB997923EC3;693.
+(rerunfilecheck)             Checksum: B51E591F4768954ED857B49E0DF27BD2;559.
  ) 
 Here is how much of TeX's memory you used:
  10569 strings out of 467871
- 169804 string characters out of 5418377
- 581356 words of memory out of 5000000
+ 169752 string characters out of 5418377
+ 581381 words of memory out of 5000000
  39297 multiletter control sequences out of 15000+600000
  662303 words of font info for 89 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,11n,89p,323b,457s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,12n,89p,353b,457s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/
 cmmi10.pfb><C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts/type1/public/ams
 fonts/cm/cmr10.pfb><C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts/type1/pu
@@ -451,7 +451,7 @@ blic/amsfonts/cm/cmsy10.pfb><C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts
 /type1/urw/times/utmb8a.pfb><C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts
 /type1/urw/times/utmr8a.pfb><C:/Users/andre/AppData/Local/Programs/MiKTeX/fonts
 /type1/urw/times/utmri8a.pfb>
-Output written on wsc26_gnss_abstract.pdf (2 pages, 3008074 bytes).
+Output written on wsc26_gnss_abstract.pdf (2 pages, 3003586 bytes).
 PDF statistics:
  84 PDF objects out of 1000 (max. 8388607)
  13 named destinations out of 1000 (max. 500000)

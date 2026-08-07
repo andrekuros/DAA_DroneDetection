@@ -199,6 +199,10 @@ def run_flight(run_name: str, out_dir: Path, deny_at_m: float, args,
     ]
     if args.corridor_e is not None:
         cmd += ["--corridor-e", str(args.corridor_e)]
+    if args.record_frames:
+        cmd += ["--record-frames",
+                "--frame-hz", str(args.frame_hz),
+                "--cloud-hz", str(args.cloud_hz)]
     cmd += [
         "--distance-m", str(args.distance_m),
         "--alt-m", str(args.alt_m),
@@ -238,6 +242,10 @@ def main() -> None:
     ap.add_argument("--alt-m", type=float, default=60.0, metavar="M")
     ap.add_argument("--rate-hz", type=float, default=20.0, metavar="HZ")
     ap.add_argument("--lidar-hz", type=float, default=4.0, metavar="HZ")
+    ap.add_argument("--record-frames", action="store_true",
+                    help="Grava frames da camera nadir e nuvens do LiDAR em cada voo")
+    ap.add_argument("--frame-hz", type=float, default=4.0, metavar="HZ")
+    ap.add_argument("--cloud-hz", type=float, default=2.0, metavar="HZ")
     ap.add_argument("--latency-s", type=float, default=0.255, metavar="S")
     ap.add_argument("--vehicle", default="PX4Drone", metavar="NOME")
     ap.add_argument("--ip", default="127.0.0.1", metavar="IP")

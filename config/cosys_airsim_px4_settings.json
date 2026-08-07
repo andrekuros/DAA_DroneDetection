@@ -29,6 +29,13 @@
           ],
           "X": -6.0, "Y": 0, "Z": -2.5,
           "Pitch": -12, "Roll": 0, "Yaw": 0
+        },
+        "vio_cam": {
+          "CaptureSettings": [
+            {"ImageType": 0, "Width": 1024, "Height": 768, "FOV_Degrees": 90}
+          ],
+          "X": 0, "Y": 0, "Z": 0.15,
+          "Pitch": -90, "Roll": 0, "Yaw": 0
         }
       },
 
@@ -38,19 +45,20 @@
         "Gps":          {"SensorType": 3, "Enabled": true},
         "Magnetometer": {"SensorType": 4, "Enabled": true},
 
-        "LidarStructure": {
+        "LidarNadir": {
           "SensorType": 6,
           "Enabled": true,
           "NumberOfChannels": 16,
-          "Range": 80,
+          "Range": 400,
           "RotationsPerSecond": 5,
-          "MeasurementsPerCycle": 256,
-          "VerticalFOVUpper": 15,
-          "VerticalFOVLower": -15,
+          "MeasurementsPerCycle": 512,
+          "VerticalFOVUpper": 10,
+          "VerticalFOVLower": -10,
           "HorizontalFOVStart": 0,
           "HorizontalFOVEnd": 360,
-          "X": 0, "Y": 0, "Z": -0.2,
-          "Roll": 0, "Pitch": 0, "Yaw": 0,
+          "DataFrame": "SensorLocalFrame",
+          "X": 0, "Y": 0, "Z": 0.2,
+          "Roll": 0, "Pitch": -90, "Yaw": 0,
           "DrawDebugPoints": false
         }
       },

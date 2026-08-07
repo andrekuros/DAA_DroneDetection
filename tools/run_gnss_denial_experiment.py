@@ -56,7 +56,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT / "tools"))
 
-from airsim_gt import AirSimGroundTruth  # noqa: E402
+from airsim_gt import AirSimGroundTruth, FrameRecorder  # noqa: E402
 from px4_link import DEFAULT_SYSTEM_ADDRESS, PX4Link  # noqa: E402
 
 # As 7 colunas pedidas no protocolo, mais o minimo para tornar o dado analisavel
@@ -75,7 +75,7 @@ CSV_FIELDS = [
     "imu_ax", "imu_ay", "imu_az", "imu_gx", "imu_gy", "imu_gz",
     "baro_alt_m", "baro_pressure", "mag_x", "mag_y", "mag_z",
     # Observabilidade de scan-matching: quanta estrutura o LiDAR enxerga
-    "lidar_points", "lidar_mean_range_m", "lidar_min_range_m",
+    "lidar_points", "lidar_mean_range_m", "lidar_min_range_m", "lidar_agl_m",
     # Validade: impacto contra a cena contamina IMU e dinamica
     "collided", "collision_object",
 ]
@@ -113,6 +113,12 @@ class ExperimentConfig:
     # +1 = Norte, -1 = Sul. A campanha alterna para o veiculo repetir o mesmo
     # corredor validado em vez de avancar para cidade nova a cada voo.
     direction: int = 1
+    # Gravacao de frames da camera nadir + nuvens do LiDAR. Sem isto os fatores
+    # visuais do factor graph so podem ser sintetizados do ground truth; com os
+    # frames em disco o VIO e reprocessado do pixel.
+    record_frames: bool = False
+    frame_hz: float = 4.0
+    cloud_hz: float = 2.0
     # Coordenada E (Leste) do corredor validado. None = usa a posicao atual.
     # Fixar em absoluto faz o vaivem repetir SEMPRE a mesma rua, que e o unico
     # jeito de a validacao do corredor valer para todos os voos da campanha.
@@ -196,6 +202,7 @@ async def sample_loop(
             sen.lidar_points = last_sensors.lidar_points
             sen.lidar_mean_range_m = last_sensors.lidar_mean_range_m
             sen.lidar_min_range_m = last_sensors.lidar_min_range_m
+            sen.lidar_agl_m = last_sensors.lidar_agl_m
         px4_s = link.latest
 
         if state.get("origin_offset") is None and gt_s.valid and px4_s.valid:
@@ -260,6 +267,7 @@ async def sample_loop(
             "lidar_points": sen.lidar_points,
             "lidar_mean_range_m": sen.lidar_mean_range_m,
             "lidar_min_range_m": sen.lidar_min_range_m,
+            "lidar_agl_m": sen.lidar_agl_m,
             "collided": sen.collided,
             "collision_object": sen.collision_object,
         })
@@ -340,6 +348,11 @@ async def run(cfg: ExperimentConfig, no_fly: bool, watch_s: float, do_plot: bool
     stop_event = asyncio.Event()
     link = PX4Link(system_address=cfg.system_address, takeoff_alt_m=cfg.takeoff_alt_m)
     gt = AirSimGroundTruth(vehicle_name=cfg.vehicle_name, ip=cfg.airsim_ip)
+    recorder = (
+        FrameRecorder(run_dir, vehicle_name=cfg.vehicle_name, ip=cfg.airsim_ip,
+                      frame_hz=cfg.frame_hz, cloud_hz=cfg.cloud_hz)
+        if cfg.record_frames else None
+    )
     status = "ok"
 
     try:
@@ -354,6 +367,10 @@ async def run(cfg: ExperimentConfig, no_fly: bool, watch_s: float, do_plot: bool
         state["hgt_ref"] = await link.ensure_baro_height_ref()
 
         sampler = asyncio.create_task(sample_loop(link, gt, logger, cfg, state, stop_event))
+        if recorder is not None:
+            recorder.start()
+            print(f"[INFO] Gravando frames a {cfg.frame_hz:.0f} Hz e nuvens a "
+                  f"{cfg.cloud_hz:.0f} Hz em {run_dir}")
 
         if no_fly:
             print(f"[INFO] --no-fly: apenas logando por {watch_s:.0f} s (sem armar).")
@@ -378,6 +395,10 @@ async def run(cfg: ExperimentConfig, no_fly: bool, watch_s: float, do_plot: bool
         # Ordem deliberada: fechar o CSV primeiro. Pouso e plot podem falhar, e
         # nao podem levar junto o dado que ja foi coletado.
         logger.close()
+        if recorder is not None:
+            recorder.stop()
+            print(f"[OK] {recorder.n_frames} frames e {recorder.n_clouds} nuvens "
+                  f"({recorder.errors} falhas de captura)")
         gt.close()
         print(f"[OK] CSV com {logger.n_rows} linhas: {csv_path}")
 
@@ -403,6 +424,11 @@ async def run(cfg: ExperimentConfig, no_fly: bool, watch_s: float, do_plot: bool
                 "occurred": bool(state.get("collision_warned")),
                 "first_t_mono": state.get("first_collision_t"),
                 "object": state.get("first_collision_object"),
+            },
+            "recording": None if recorder is None else {
+                "frames": recorder.n_frames,
+                "clouds": recorder.n_clouds,
+                "capture_errors": recorder.errors,
             },
         }
         meta_path.write_text(json.dumps(meta, indent=2, default=str), encoding="utf-8")
@@ -441,6 +467,12 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--rate-hz", type=float, default=20.0, metavar="HZ", help="Taxa de amostragem")
     ap.add_argument("--lidar-hz", type=float, default=4.0, metavar="HZ",
                     help="Cadencia de leitura da nuvem LiDAR (0 desativa)")
+    ap.add_argument("--record-frames", action="store_true",
+                    help="Grava frames da camera nadir e nuvens do LiDAR (para VIO offline)")
+    ap.add_argument("--frame-hz", type=float, default=4.0, metavar="HZ",
+                    help="Cadencia de captura de frames")
+    ap.add_argument("--cloud-hz", type=float, default=2.0, metavar="HZ",
+                    help="Cadencia de gravacao das nuvens do LiDAR")
     ap.add_argument("--latency-s", type=float, default=0.255, metavar="S",
                     help="Latencia de transporte do PX4, medida no voo de referencia")
     ap.add_argument("--out-dir", type=Path, default=Path("dataset_gnss_denial"), metavar="DIR")
@@ -466,6 +498,9 @@ def main() -> None:
         deny_at_m=args.deny_at_m,
         rate_hz=args.rate_hz,
         lidar_hz=args.lidar_hz,
+        record_frames=args.record_frames,
+        frame_hz=args.frame_hz,
+        cloud_hz=args.cloud_hz,
         transport_latency_s=args.latency_s,
         out_dir=args.out_dir,
         run_name=args.run_name,
