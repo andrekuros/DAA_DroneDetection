@@ -1,0 +1,66 @@
+{
+  "SettingsVersion": 2.0,
+  "SimMode": "Multirotor",
+  "ViewMode": "SpringArmChase",
+  "ClockSpeed": 1.0,
+
+  "Vehicles": {
+    "PX4Drone": {
+      "VehicleType": "PX4Multirotor",
+      "X": 0,
+      "Y": 0,
+      "Z": -1,
+      "Yaw": 0,
+
+      "UseSerial": false,
+      "UseTcp": true,
+      "TcpPort": 4560,
+      "LockStep": true,
+
+      "ControlIp": "127.0.0.1",
+      "ControlPortLocal": 14540,
+      "ControlPortRemote": 14580,
+      "LocalHostIp": "127.0.0.1",
+
+      "Cameras": {
+        "scene_cam": {
+          "CaptureSettings": [
+            {"ImageType": 0, "Width": 1600, "Height": 900, "FOV_Degrees": 90}
+          ],
+          "X": -6.0, "Y": 0, "Z": -2.5,
+          "Pitch": -12, "Roll": 0, "Yaw": 0
+        }
+      },
+
+      "Sensors": {
+        "Barometer":    {"SensorType": 1, "Enabled": true},
+        "Imu":          {"SensorType": 2, "Enabled": true},
+        "Gps":          {"SensorType": 3, "Enabled": true},
+        "Magnetometer": {"SensorType": 4, "Enabled": true},
+
+        "LidarStructure": {
+          "SensorType": 6,
+          "Enabled": true,
+          "NumberOfChannels": 16,
+          "Range": 80,
+          "RotationsPerSecond": 5,
+          "MeasurementsPerCycle": 256,
+          "VerticalFOVUpper": 15,
+          "VerticalFOVLower": -15,
+          "HorizontalFOVStart": 0,
+          "HorizontalFOVEnd": 360,
+          "X": 0, "Y": 0, "Z": -0.2,
+          "Roll": 0, "Pitch": 0, "Yaw": 0,
+          "DrawDebugPoints": false
+        }
+      },
+
+      "Parameters": {
+        "NAV_RCL_ACT": 0,
+        "NAV_DLL_ACT": 0
+      }
+    }
+  },
+
+  "SubWindows": []
+}

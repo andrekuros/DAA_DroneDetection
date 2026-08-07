@@ -1,0 +1,19 @@
+\begin{thebibliography}{}
+
+\bibitem[\protect\citeauthoryear{Dellaert and Kaess}{Dellaert and
+  Kaess}{2017}]{dellaert2017factor}
+Dellaert, F., and M.~Kaess. 2017.
+\newblock ``Factor Graphs for Robot Perception''.
+\newblock {\em Foundations and Trends in Robotics\/}~6(1--2):1--139.
+
+
+\bibitem[\protect\citeauthoryear{Jansen, Verreycken, Schouten, Simon, Cornelis,
+  and Hellinckx}{Jansen et~al.}{2023}]{jansen2023cosys}
+Jansen, W., E.~Verreycken, A.~Schouten, D.~Simon, C.~Cornelis, and
+  P.~Hellinckx. 2023.
+\newblock ``{Cosys-AirSim}: A Simulation Framework for Multi-Modal Sensing in
+  {UAV} Applications''.
+\newblock In {\em Proc.\ International Conference on Unmanned Aircraft Systems
+  ({ICUAS})},  1--8.
+
+\end{thebibliography}

@@ -1,0 +1,63 @@
+This is BibTeX, Version 0.99e
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: wsc26_abstract.aux
+Reallocating 'name_of_file' (item size: 1) to 4 items.
+The style file: wsc.bst
+Reallocating 'name_of_file' (item size: 1) to 10 items.
+Database file #1: wsc26refs.bib
+Reallocating 'wiz_functions' (item size: 4) to 6000 items.
+Warning--empty organization in abramson2020sum
+Warning--no doi in abramson2020sum
+Warning--empty organization in ester1996dbscan
+Warning--no doi in ester1996dbscan
+Warning--empty organization in jansen2023cosys
+Warning--no doi in jansen2023cosys
+Warning--no doi in jocher2023yolo
+Warning--no doi in nasa_wellclear
+Warning--no doi in rtca_do365b
+Warning--empty organization in shah2018airsim
+Warning--no doi in shah2018airsim
+Warning--empty organization in tobin2017domain
+Warning--no doi in tobin2017domain
+You've used 8 entries,
+            3018 wiz_defined-function locations,
+            681 strings with 6775 characters,
+and the built_in function-call counts, 6774 in all, are:
+= -- 531
+> -- 582
+< -- 34
++ -- 166
+- -- 168
+* -- 615
+:= -- 1118
+add.period$ -- 26
+call.type$ -- 8
+change.case$ -- 61
+chr.to.int$ -- 8
+cite$ -- 21
+duplicate$ -- 191
+empty$ -- 384
+format.name$ -- 188
+if$ -- 1352
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 5
+newline$ -- 45
+num.names$ -- 70
+pop$ -- 100
+preamble$ -- 1
+purify$ -- 116
+quote$ -- 0
+skip$ -- 249
+stack$ -- 0
+substring$ -- 266
+swap$ -- 74
+text.length$ -- 4
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 192
+warning$ -- 13
+while$ -- 62
+width$ -- 0
+write$ -- 123
+(There were 13 warnings)

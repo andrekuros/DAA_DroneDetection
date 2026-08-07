@@ -1,0 +1,8 @@
+{
+  "campaign": "smoke_campaign",
+  "n_denied": 0,
+  "n_baseline": 1,
+  "fits": [],
+  "baseline_floor_median_m": 0.48736182936470346,
+  "baseline_floor_p95_m": 1.3809308523223485
+}

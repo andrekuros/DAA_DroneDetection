@@ -40,3 +40,6 @@ dataset_exp30_yolo_narrow_hd/
 dataset_exp30_multicam_yolo/
 dataset_exp30_yolo_medium/
 dataset_exp30_yolo_lowcost640/
+
+# Runs do experimento GNSS-denied (telemetria bruta por voo)
+dataset_gnss_denial/

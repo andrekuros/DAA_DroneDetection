@@ -188,43 +188,198 @@ def plot_dataset_sizes(labels: list[str], trains: list[int], vals: list[int], ou
     plt.close(fig)
 
 
-def plot_sensor_distance_bars(outfile: Path) -> None:
-    """Static recreation of report Table 2.3.4 style (Point D aligned methodology)."""
-    import matplotlib.pyplot as plt
+def _sensor_band_arrays():
     import numpy as np
 
     bands = ["0–10", "10–25", "25–50", "50–100", "100–150", "150–250"]
-    rgb = np.array([7.5, 2.8, 10.2, 6.7, 1.2, 0.0])
+    eo_unified = np.array([55.6, 44.3, 91.1, 100.0, 2.0, 0.0])
     os128 = np.array([77.6, 77.1, 67.7, 55.4, 58.5, 6.7])
     vlp16 = np.array([29.9, 32.1, 16.5, 11.2, 0.0, 0.0])
     radar = np.array([100.0] * 6)
+    return bands, eo_unified, os128, vlp16, radar
+
+
+def plot_sensor_distance_bars(outfile: Path) -> None:
+    """Cross-sensor detection rate by distance band.
+    EO rates: unified multi-camera YOLOv8s (any-camera-detects policy).
+    LiDAR/Radar: from original synchronized benchmark (unchanged)."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    bands, eo_unified, os128, vlp16, radar = _sensor_band_arrays()
     x = np.arange(len(bands))
     w = 0.2
     fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
-    ax.bar(x - 1.5 * w, rgb, w, label="RGB YOLO (ref. HD)")
-    ax.bar(x - 0.5 * w, os128, w, label="LiDAR OS128")
-    ax.bar(x + 0.5 * w, vlp16, w, label="LiDAR VLP-16")
-    ax.bar(x + 1.5 * w, radar, w, label="Radar (presença)")
+    ax.bar(x - 1.5 * w, eo_unified, w, label="EO/Vision (YOLOv8s, multi-cam)", color="#2ECC71")
+    ax.bar(x - 0.5 * w, os128, w, label="LiDAR HD (OS128)", color="#3498DB")
+    ax.bar(x + 0.5 * w, vlp16, w, label="LiDAR Sparse (VLP-16)", color="#9B59B6")
+    ax.bar(x + 1.5 * w, radar, w, label="Radar (return-presence)", color="#E74C3C")
     ax.set_xticks(x)
     ax.set_xticklabels(bands)
-    ax.set_ylabel("Taxa de deteção (%)")
-    ax.set_xlabel("Banda de distância (m)")
-    ax.set_title("Benchmark alinhado 640 frames — taxa por modalidade e distância")
+    ax.set_ylabel("Detection rate (%)")
+    ax.set_xlabel("Intruder distance band (m)")
+    ax.set_title("Cross-Sensor Detection Rate by Distance — Exp. 30 Synchronized Benchmark")
     ax.legend(loc="upper right", fontsize=8)
-    ax.set_ylim(0, 105)
+    ax.set_ylim(0, 108)
+    ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
     fig.savefig(outfile.with_suffix(".pdf"), bbox_inches="tight")
     fig.savefig(outfile.with_suffix(".png"), bbox_inches="tight")
     plt.close(fig)
 
 
+def plot_wsc26_composite(outfile: Path) -> None:
+    """WSC26 Fig.1: detection rate vs range (compact single panel for 2-page abstract)."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    bands, eo_unified, os128, vlp16, radar = _sensor_band_arrays()
+    x = np.arange(len(bands))
+    w = 0.2
+
+    fig, ax = plt.subplots(figsize=(6.0, 2.35), dpi=200)
+    ax.bar(x - 1.5 * w, eo_unified, w, label="EO (YOLOv8s)", color="#2ECC71")
+    ax.bar(x - 0.5 * w, os128, w, label="LiDAR HD", color="#3498DB")
+    ax.bar(x + 0.5 * w, vlp16, w, label="LiDAR Sparse", color="#9B59B6")
+    ax.bar(x + 1.5 * w, radar, w, label="Radar (presence)", color="#E74C3C")
+    ax.set_xticks(x)
+    ax.set_xticklabels(bands, fontsize=8)
+    ax.set_ylabel("Detection rate (%)", fontsize=9)
+    ax.set_xlabel("Intruder distance band (m)", fontsize=9)
+    ax.set_ylim(0, 110)
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(loc="upper right", fontsize=7, framealpha=0.9, ncol=2)
+    fig.tight_layout()
+    fig.savefig(outfile.with_suffix(".pdf"), bbox_inches="tight")
+    fig.savefig(outfile.with_suffix(".png"), bbox_inches="tight")
+    plt.close(fig)
+    print("Wrote", outfile.with_suffix(".pdf"))
+
+
+def _trim_letterbox(img):
+    """Crop uniform black letterbox padding (e.g. 16:9 padded into 4:3)."""
+    import numpy as np
+
+    # Non-black mask: any channel above a low threshold.
+    mask = img.max(axis=2) > 8
+    rows = np.where(mask.any(axis=1))[0]
+    cols = np.where(mask.any(axis=0))[0]
+    if len(rows) == 0 or len(cols) == 0:
+        return img
+    return img[rows[0] : rows[-1] + 1, cols[0] : cols[-1] + 1]
+
+
+def _resize_h(img, th: int):
+    """Resize image to target height, preserving aspect ratio."""
+    from PIL import Image as _Image
+    import numpy as np
+
+    pil = _Image.fromarray(img)
+    nw = int(round(pil.width * (th / pil.height)))
+    return np.asarray(pil.resize((nw, th), _Image.Resampling.LANCZOS))
+
+
+def _label_panel(img, text: str):
+    """Draw a small opaque label in the top-left corner."""
+    import cv2
+    import numpy as np
+
+    out = img.copy()
+    if out.dtype != np.uint8:
+        out = out.astype(np.uint8)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = max(0.45, min(out.shape[:2]) / 900)
+    thick = max(1, int(round(scale * 2)))
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
+    pad = 4
+    cv2.rectangle(out, (4, 4), (4 + tw + 2 * pad, 4 + th + 2 * pad), (0, 0, 0), -1)
+    cv2.putText(out, text, (4 + pad, 4 + th + pad - 1), font, scale, (0, 220, 255), thick, cv2.LINE_AA)
+    return out
+
+
+def plot_wsc26_urban_panels(outfile: Path, source: Path | None = None) -> None:
+    """WSC26 Fig.2: horizontal 1x4 — cameras (left pair) then weather (right pair)."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from PIL import Image
+
+    cam_src = source or (FIGURES / "shot.png")
+    wx_src = FIGURES / "exp30_encounter_conditions.png"
+    if not cam_src.exists():
+        raise FileNotFoundError(f"Urban composite not found: {cam_src}")
+    if not wx_src.exists():
+        raise FileNotFoundError(f"Weather grid not found: {wx_src}")
+
+    cam = np.asarray(Image.open(cam_src).convert("RGB"))
+    ch, cw = cam.shape[:2]
+    mid_y, mid_x = ch // 2, cw // 2
+    # shot.png 2x2: TL Standard, TR Narrow HD, BL Medium, BR Low-Cost.
+    narrow = _trim_letterbox(cam[:mid_y, mid_x:])
+    lowcost = _trim_letterbox(cam[mid_y:, mid_x:])
+
+    wx = np.asarray(Image.open(wx_src).convert("RGB"))
+    wh, ww = wx.shape[:2]
+    # exp30_encounter_conditions.png is 2x3:
+    # TL Clear day, TM Dusk, TR Rain / BL Night, BM Snow, BR Dust/Haze.
+    cell_h, cell_w = wh // 2, ww // 3
+    clear = wx[:cell_h, :cell_w]
+    rain = wx[:cell_h, 2 * cell_w :]
+
+    target_h = 280
+    panels = [
+        _label_panel(_resize_h(narrow, target_h), "Narrow HD"),
+        _label_panel(_resize_h(lowcost, target_h), "Low-Cost"),
+        _label_panel(_resize_h(clear, target_h), "Clear day"),
+        _label_panel(_resize_h(rain, target_h), "Rain"),
+    ]
+    # Equal height already; crop/pad to a common cell width for a clean strip.
+    cell_w_tgt = min(p.shape[1] for p in panels)
+
+    def _fit_w(img, width):
+        if img.shape[1] == width:
+            return img
+        if img.shape[1] > width:
+            x0 = (img.shape[1] - width) // 2
+            return img[:, x0 : x0 + width]
+        pad = np.zeros((img.shape[0], width - img.shape[1], 3), dtype=np.uint8)
+        return np.hstack([img, pad])
+
+    panels = [_fit_w(p, cell_w_tgt) for p in panels]
+    gap = 3
+    group_gap = 8
+    white = np.full((target_h, gap, 3), 255, dtype=np.uint8)
+    group = np.full((target_h, group_gap, 3), 255, dtype=np.uint8)
+    # Cameras | Weather, with a wider gap between groups.
+    strip = np.hstack(
+        [panels[0], white, panels[1], group, panels[2], white, panels[3]]
+    )
+
+    fig, ax = plt.subplots(figsize=(6.6, 1.45), dpi=220)
+    ax.imshow(strip)
+    ax.axis("off")
+    # Group boundary between camera pair and weather pair.
+    split = 2 * cell_w_tgt + gap + group_gap // 2
+    ax.axvline(split, color="#888888", linewidth=1.0, alpha=0.85)
+    fig.tight_layout(pad=0.02)
+    fig.savefig(outfile.with_suffix(".pdf"), bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(outfile.with_suffix(".png"), bbox_inches="tight", pad_inches=0.02)
+    plt.close(fig)
+    print("Wrote", outfile.with_suffix(".pdf"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-cross-val", action="store_true")
+    ap.add_argument("--wsc26-only", action="store_true", help="Only build figures/wsc26_fig1 and fig2")
     ap.add_argument("--device", default="0")
     args = ap.parse_args()
 
     FIGURES.mkdir(parents=True, exist_ok=True)
+
+    if args.wsc26_only:
+        plot_wsc26_composite(FIGURES / "wsc26_fig1")
+        plot_wsc26_urban_panels(FIGURES / "wsc26_fig2")
+        return
 
     rows: list[dict] = []
     labels: list[str] = []
@@ -260,6 +415,8 @@ def main() -> None:
     plot_map_curves(curves, FIGURES / "exp30_yolo_map_curves")
     plot_dataset_sizes(size_labels, sizes_train, sizes_val, FIGURES / "exp30_yolo_dataset_sizes")
     plot_sensor_distance_bars(FIGURES / "exp30_sensor_detection_by_distance")
+    plot_wsc26_composite(FIGURES / "wsc26_fig1")
+    plot_wsc26_urban_panels(FIGURES / "wsc26_fig2")
 
     cross: list[dict] = []
     if not args.no_cross_val:

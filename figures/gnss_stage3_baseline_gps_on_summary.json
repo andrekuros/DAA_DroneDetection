@@ -1,0 +1,8 @@
+{
+  "samples": 207,
+  "err_norm_final_m": 3.389366753895497,
+  "err_norm_max_m": 3.9039438631532404,
+  "err_norm_mean_gps_on_m": 1.0707900677951165,
+  "err_norm_mean_gps_off_m": null,
+  "duration_s": 20.0470000000023
+}

@@ -5,3 +5,7 @@ mss
 pywin32
 numpy
 ultralytics>=8.0
+
+# Experimento GNSS-denied (PX4 SITL): tools/run_gnss_denial_experiment.py
+mavsdk
+matplotlib
