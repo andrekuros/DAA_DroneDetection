@@ -528,7 +528,13 @@ class PX4Link:
                 except Exception as e:
                     last_err = e
                     if attempt < 7:
-                        await asyncio.sleep(1.0)
+                        # Backoff crescente: o timeout do cliente de parametros do
+                        # MAVSDK aparece em rajadas, e insistir na mesma cadencia
+                        # so consome as tentativas dentro da mesma rajada. Esperar
+                        # progressivamente mais da chance de a fila drenar.
+                        # Atrasar a negacao nao invalida o voo: o instante real e
+                        # registrado e a deriva e medida a partir dele.
+                        await asyncio.sleep(1.0 + 1.5 * attempt)
 
             if denied_via is None:
                 # Fallback so para PX4 antigo. Se GPS_CTRL existe e falhou, o problema

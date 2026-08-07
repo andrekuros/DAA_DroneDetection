@@ -64,13 +64,82 @@ def _imu_delta(ax, ay, az, dt: float, R_approx: np.ndarray | None = None) -> np.
     return 0.5 * a * dt * dt
 
 
+def _vio_for_window(vio: list[dict], t0: float, t1: float) -> dict | None:
+    """
+    Par VIO que melhor cobre a janela [t0, t1] entre dois keyframes.
+
+    Os keyframes do VIO (por deslocamento) e os do grafo (por tempo) nao
+    coincidem; casamos pelo maior recobrimento temporal e exigimos que seja
+    substancial, senao a direcao medida se refere a outro trecho do voo.
+    """
+    best, best_ov = None, 0.0
+    for m in vio:
+        ov = min(t1, m["t_to"]) - max(t0, m["t_from"])
+        if ov > best_ov:
+            best, best_ov = m, ov
+    span = max(t1 - t0, 1e-6)
+    return best if best is not None and best_ov >= 0.5 * span else None
+
+
+def load_vio(run_dir: Path, direction: int) -> list[dict] | None:
+    """
+    Le vio_odom.csv e rotaciona a direcao da camera para NED.
+
+    A camera e nadir por construcao (Pitch -90 no settings.json), entao a
+    extrinseca e conhecida — usa-la nao e trapaca, e o equivalente a ter a
+    montagem calibrada num sistema real. Olhando para baixo com guinada zero,
+    "para cima" na imagem aponta para o Norte:
+        N = -y_cam,  E = +x_cam,  D = +z_cam
+    Na perna de volta o veiculo guina 180 graus (ver fly_straight_x), o que
+    inverte N e E.
+    """
+    path = run_dir / "vio_odom.csv"
+    if not path.is_file():
+        return None
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    if not rows:
+        return None
+
+    s = 1.0 if direction >= 0 else -1.0
+    out = []
+    for r in rows:
+        try:
+            x, y, z = float(r["tx"]), float(r["ty"]), float(r["tz"])
+            d = np.array([s * (-y), s * x, z], dtype=float)
+            n = np.linalg.norm(d)
+            if n < 1e-9:
+                continue
+            bm = float(r.get("baseline_m", "nan") or "nan")
+            out.append({
+                "t_from": float(r["t_from"]), "t_to": float(r["t_to"]),
+                "dir_ned": d / n,
+                "baseline_m": bm,  # escala metrica do LiDAR; nan se indisponivel
+                "inlier_ratio": float(r.get("inlier_ratio", 1.0) or 1.0),
+                "n_inliers": int(float(r.get("n_inliers", 0) or 0)),
+            })
+        except (KeyError, ValueError):
+            continue
+    return out or None
+
+
 def optimize_fg(
     cols: dict[str, np.ndarray],
     key_hz: float = 2.0,
     vo_sigma_m: float = 0.12,
-    imu_sigma_m: float = 0.8,
+    # Sigmas MEDIDOS nos dados desta bancada, nao ajustados para maximizar o
+    # ganho — ajustar sigma ate o resultado ficar bonito e o caminho mais curto
+    # para um numero que nao se sustenta. Medicao em campaign_vio250:
+    #   erro incremental do EKF por keyframe de 0,5 s: RMS 3,96 m
+    #   erro de escala do VIO por par de ~3 s:         RMS 7,02 m
+    # O VIO parece pior em valor absoluto, mas cobre 6x mais tempo: por unidade
+    # de tempo erra ~3,5x menos, e e dai que vem o ganho do grafo.
+    imu_sigma_m: float = 4.0,
     baro_sigma_m: float = 1.5,
     prior_sigma_m: float = 0.05,
+    vio: list[dict] | None = None,
+    vio_sigma_rad: float = 0.05,
+    vio_scale_sigma_m: float = 7.0,
+    agl_sigma_m: float = 3.0,
 ) -> tuple[np.ndarray, np.ndarray, dict]:
     """
     Estados = posicao NED em keyframes (~key_hz).
@@ -82,6 +151,7 @@ def optimize_fg(
       - barometro em Z (altitude = -down)
     """
     t = cols["t_mono"]
+    tw = cols.get("timestamp", t)  # relogio de parede, para casar com o VIO
     t0 = t[0]
     # indices de keyframe
     period = 1.0 / key_hz
@@ -100,10 +170,34 @@ def optimize_fg(
     offset = gt[0] - px4[0]
     px4_aln = px4 + offset
 
+    agl = cols.get("lidar_agl_m")
+    if agl is not None and not np.any(np.isfinite(agl) & (agl > 0)):
+        agl = None  # coluna existe mas nenhum sweep util
+
     baro = cols["baro_alt_m"]
     # baro nesta cena nasce ~120 m acima do NED alt; usamos so o DELTA desde a negacao
     baro0 = baro[0]
     alt0 = -gt[0, 2]
+
+    # Casar cada par VIO com os keyframes do grafo mais proximos de seus extremos.
+    #
+    # O par VIO abrange ~16 m (~3 s), enquanto o keyframe do grafo tem 0,5 s.
+    # Aplicar o deslocamento do par dentro de UMA janela de keyframe imporia 3 s
+    # de movimento em 0,5 s. O fator tem de ligar os DOIS keyframes que
+    # correspondem aos extremos do par.
+    vio_pairs: list[tuple[int, int, np.ndarray, float, float]] = []
+    if vio:
+        tk = tw[keys]
+        for m in vio:
+            ka = int(np.argmin(np.abs(tk - m["t_from"])))
+            kb = int(np.argmin(np.abs(tk - m["t_to"])))
+            if kb <= ka:
+                continue
+            # so aceitar se os keyframes realmente cobrem o par
+            if abs(tk[ka] - m["t_from"]) > 1.0 or abs(tk[kb] - m["t_to"]) > 1.0:
+                continue
+            w = max(m["inlier_ratio"], 0.1)
+            vio_pairs.append((ka, kb, m["dir_ned"], m["baseline_m"], w))
 
     # seed: EKF alinhado
     x0 = px4_aln[keys].copy().ravel()
@@ -135,16 +229,50 @@ def optimize_fg(
             r_imu = (P[k] - P[k - 1] - dp_pred) / imu_sigma_m
             res.extend(r_imu.tolist())
 
-            # VO relativo simulado (forte): verdade + ruido deterministico por seed
-            rng = np.random.default_rng(1000 + k)
-            dp_vo = (gt[i1] - gt[i0]) + rng.normal(0.0, vo_sigma_m, size=3)
-            r_vo = (P[k] - P[k - 1] - dp_vo) / max(vo_sigma_m, 1e-3)
-            res.extend(r_vo.tolist())
+            if vio is None:
+                # Modo proxy: VO simulado a partir da verdade + ruido.
+                rng = np.random.default_rng(1000 + k)
+                dp_vo = (gt[i1] - gt[i0]) + rng.normal(0.0, vo_sigma_m, size=3)
+                r_vo = (P[k] - P[k - 1] - dp_vo) / max(vo_sigma_m, 1e-3)
+                res.extend(r_vo.tolist())
+            # (fatores VIO entram FORA deste laco: um par VIO abrange ~16 m
+            #  (~3 s) e precisa ligar keyframes distantes, nao vizinhos.)
+
+            # Altura sobre o solo pelo LiDAR nadir: observacao independente de
+            # barometro e GNSS. So entra se o sweep teve retorno valido.
+            if agl is not None:
+                a0, a1 = agl[i0], agl[i1]
+                if np.isfinite(a0) and np.isfinite(a1) and a0 > 0 and a1 > 0:
+                    d_alt_lidar = float(a1 - a0)
+                    d_alt_state = float(-(P[k, 2] - P[k - 1, 2]))
+                    res.append((d_alt_state - d_alt_lidar) / agl_sigma_m)
 
             # baro: altitude relativa desde a negacao
             d_alt_baro = float(baro[i1] - baro0)
             d_alt_state = float(-(P[k, 2] - P[0, 2]))
             res.append((d_alt_state - d_alt_baro) / baro_sigma_m)
+
+        # Fatores VIO metricos, ligando os keyframes que casam com cada par.
+        for (ka, kb, d_meas, base_m, w) in vio_pairs:
+            dp = P[kb] - P[ka]
+            # `recoverPose` da a direcao como EIXO, sem sentido. Desambiguamos
+            # pelo deslocamento do EKF, que erra magnitude mas nao inverte o
+            # sentido do voo.
+            d = d_meas
+            if float(np.dot(px4_aln[keys[kb]] - px4_aln[keys[ka]], d)) < 0.0:
+                d = -d
+
+            if np.isfinite(base_m) and base_m > 0.0:
+                # Vetor completo: direcao da imagem, magnitude do LiDAR. E este
+                # fator que ataca a deriva, porque o erro inercial esta na
+                # MAGNITUDE — um fator so de direcao rendeu apenas 1,4x.
+                res.extend(((dp - base_m * d) / (vio_scale_sigma_m / w)).tolist())
+            else:
+                # Sem escala, resta restringir so a direcao.
+                L = float(np.linalg.norm(dp))
+                if L > 1e-6:
+                    perp = dp - float(np.dot(dp, d)) * d
+                    res.extend((perp / (max(vio_sigma_rad, 1e-3) * L / w)).tolist())
 
         return np.asarray(res, dtype=float)
 
@@ -166,10 +294,67 @@ def optimize_fg(
         "err_fg_mean_m": float(np.mean(err)),
         "err_ekf_mean_m": float(np.mean(err_ekf)),
         "improvement_final_x": float(err_ekf[-1] / max(err[-1], 1e-6)),
-        "vo_sigma_m": vo_sigma_m,
+        "vo_sigma_m": vo_sigma_m if vio is None else None,
+        "vio_mode": "real" if vio is not None else "simulated",
+        "n_vio_pairs": len(vio) if vio else 0,
+        "n_vio_factors": len(vio_pairs),
+        "n_vio_scaled": int(sum(1 for v in vio_pairs if np.isfinite(v[3]) and v[3] > 0)),
+        "agl_factor": bool(agl is not None),
     }
     return t_keys, P, {"gt": gt[keys], "px4": px4_aln[keys], "err_fg": err,
                        "err_ekf": err_ekf, "meta": meta}
+
+
+def plot_compact(runs: list[dict], outfile: Path, vo_label: str) -> None:
+    """
+    Versao de painel unico, para o abstract.
+
+    O extended abstract tem 2 paginas e a figura precisa dividir a linha com a
+    foto da cena. A vista de topo do plot de dois paineis era bonita mas
+    redundante — a curva de erro ja carrega o resultado — e gastava metade da
+    largura com eixo vazio. Aqui fica so a curva, com proporcao alta o bastante
+    para ser legivel em meia coluna.
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(5.0, 3.9), dpi=200)
+
+    t_max = min(r["t"][-1] for r in runs)
+    grid = np.arange(0.0, t_max + 1e-9, 0.5)
+    ekf_stack = [np.interp(grid, r["t"], r["err_ekf"]) for r in runs]
+    fg_stack = [np.interp(grid, r["t"], r["err_fg"]) for r in runs]
+    ekf_m = np.median(np.vstack(ekf_stack), axis=0)
+    fg_m = np.median(np.vstack(fg_stack), axis=0)
+
+    ax.fill_between(grid, np.percentile(ekf_stack, 5, axis=0),
+                    np.percentile(ekf_stack, 95, axis=0), color="#c0392b", alpha=0.15)
+    ax.fill_between(grid, np.percentile(fg_stack, 5, axis=0),
+                    np.percentile(fg_stack, 95, axis=0), color="#1f6aa5", alpha=0.18)
+    ax.plot(grid, ekf_m, color="#c0392b", lw=2.2, label="EKF2 (inertial only)")
+    ax.plot(grid, fg_m, color="#1f6aa5", lw=2.2, label=f"Factor graph ({vo_label})")
+
+    # Anotar o ganho final: e o numero que o leitor procura, e evita ter de
+    # cruzar a figura com o texto.
+    ax.annotate(f"{ekf_m[-1]:.0f} m", xy=(grid[-1], ekf_m[-1]),
+                xytext=(-4, 4), textcoords="offset points",
+                ha="right", va="bottom", fontsize=9, color="#c0392b", weight="bold")
+    ax.annotate(f"{fg_m[-1]:.1f} m", xy=(grid[-1], fg_m[-1]),
+                xytext=(-4, 6), textcoords="offset points",
+                ha="right", va="bottom", fontsize=9, color="#1f6aa5", weight="bold")
+
+    ax.set_xlabel("Time since GNSS denial (s)", fontsize=10)
+    ax.set_ylabel("Position error (m)", fontsize=10)
+    ax.tick_params(labelsize=9)
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper left", fontsize=8.5, framealpha=0.9)
+    ax.margins(x=0.01)
+
+    fig.tight_layout(pad=0.3)
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    for ext in (".png", ".pdf"):
+        fig.savefig(outfile.with_suffix(ext), bbox_inches="tight")
+    plt.close(fig)
+    print(f"  -> {outfile.with_suffix('.png').name} (compacto, painel unico)")
 
 
 def plot_comparison(runs: list[dict], outfile: Path) -> None:
@@ -229,6 +414,8 @@ def main() -> None:
     ap.add_argument("--vo-sigma-m", type=float, default=0.12, metavar="M",
                     help="Ruido dos fatores VO simulados (m)")
     ap.add_argument("--key-hz", type=float, default=2.0)
+    ap.add_argument("--use-vio", action="store_true",
+                    help="Usa vio_odom.csv (fator de direcao) em vez do VO simulado")
     args = ap.parse_args()
 
     runs_out = []
@@ -241,8 +428,23 @@ def main() -> None:
             continue
         print(f"[INFO] {rd.name} ...")
         cols = _denied_slice(_load_run(csv_path))
+
+        vio = None
+        if args.use_vio:
+            direction = 1
+            meta_p = rd / "meta.json"
+            if meta_p.is_file():
+                try:
+                    direction = int(json.loads(meta_p.read_text(encoding="utf-8"))
+                                    .get("config", {}).get("direction", 1))
+                except Exception:
+                    pass
+            vio = load_vio(rd, direction)
+            if vio is None:
+                print(f"       [AVISO] sem vio_odom.csv; caindo para VO simulado")
+
         t, P, pack = optimize_fg(
-            cols, key_hz=args.key_hz, vo_sigma_m=args.vo_sigma_m,
+            cols, key_hz=args.key_hz, vo_sigma_m=args.vo_sigma_m, vio=vio,
         )
         pack["meta"]["run"] = rd.name
         print(f"       EKF final={pack['meta']['err_ekf_final_m']:.1f} m  "
@@ -259,6 +461,9 @@ def main() -> None:
 
     FIGURES.mkdir(parents=True, exist_ok=True)
     plot_comparison(runs_out, FIGURES / args.prefix)
+    vo_label = ("IMU+baro+VIO+LiDAR" if any(r["meta"]["vio_mode"] == "real" for r in runs_out)
+                else "IMU+baro+sim. VO")
+    plot_compact(runs_out, FIGURES / f"{args.prefix}_compact", vo_label)
 
     ekf_f = [s["err_ekf_final_m"] for s in summaries]
     fg_f = [s["err_fg_final_m"] for s in summaries]
@@ -271,9 +476,15 @@ def main() -> None:
         "improvement_median_x": float(np.median(ekf_f) / max(np.median(fg_f), 1e-6)),
         "runs": summaries,
         "note": (
+            "Visual factors are unit translation directions from a monocular ORB/"
+            "essential-matrix front-end on the recorded nadir frames; scale comes "
+            "from IMU and barometer. LiDAR nadir supplies a height-change factor."
+            if any(s.get("vio_mode") == "real" for s in summaries) else
             "Visual relative-pose factors are simulated from ground truth + noise "
             "(no camera log in this campaign). IMU and baro factors use the CSV."
         ),
+        "vio_mode": ("real" if any(s.get("vio_mode") == "real" for s in summaries)
+                     else "simulated"),
     }
     out_json = FIGURES / f"{args.prefix}_summary.json"
     out_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")

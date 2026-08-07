@@ -1,0 +1,42 @@
+{
+  "campaign": "campaign_vio250",
+  "n_denied": 3,
+  "n_baseline": 2,
+  "fits": [
+    {
+      "run": "denied_rep01",
+      "A": 0.0735956002786677,
+      "p": 1.9587591951616334,
+      "r2": 0.9530834036749727,
+      "err_final_m": 101.08679832016314,
+      "exposure_s": 35.88999999999942
+    },
+    {
+      "run": "denied_rep02",
+      "A": 0.5650363592899706,
+      "p": 1.8372389297136495,
+      "r2": 0.9851657325646461,
+      "err_final_m": 238.87969800853625,
+      "exposure_s": 24.938000000009197
+    },
+    {
+      "run": "denied_rep03",
+      "A": 0.20379590345319376,
+      "p": 2.1530789312981895,
+      "r2": 0.9843273598469455,
+      "err_final_m": 338.7178297106838,
+      "exposure_s": 31.296000000002095
+    }
+  ],
+  "exponent_p_median": 1.9587591951616334,
+  "exponent_p_min": 1.8372389297136495,
+  "exponent_p_max": 2.1530789312981895,
+  "err_final_median_m": 238.87969800853625,
+  "err_final_min_m": 101.08679832016314,
+  "err_final_max_m": 338.7178297106838,
+  "baseline_floor_median_m": 0.669341225921313,
+  "baseline_floor_p95_m": 1.851267512984251,
+  "lidar_points_median": 2401.0,
+  "lidar_points_p05": 2308.0,
+  "frac_frames_with_structure": 1.0
+}

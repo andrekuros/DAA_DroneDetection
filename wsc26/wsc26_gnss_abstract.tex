@@ -5,6 +5,12 @@
 \documentclass{wscposterproc}
 
 \usepackage{graphicx}
+% Placeholders preenchidos de gnss_vio250_fg_summary.json / vio_frontend
+\newcommand{\TODOVIO}{4.6}
+\newcommand{\TODOEKF}{241}
+\newcommand{\TODOFG}{154}
+\newcommand{\TODOSCALE}{5.9}
+\newcommand{\TODOGAIN}{1.6}
 \usepackage{booktabs}
 \usepackage{caption}
 \captionsetup{font=scriptsize,skip=2pt,labelfont=bf}
@@ -43,10 +49,11 @@ truth at $20$\,Hz.
 Because the autopilot is the real flight stack and the coupling is MAVLink
 throughout, the same scenario definition drives software- and hardware-in-the-loop
 without modification.
-We demonstrate the environment with an inertial drift baseline
-($|e| \approx 0.15\,t^{1.92}$ over $3$ runs) and by replaying a factor-graph
-smoother on the identical denied windows, reducing median terminal error from
-$88$\,m to $3.1$\,m.
+We demonstrate it with an inertial drift baseline
+($|e| \approx 0.20\,t^{1.96}$) and by replaying a factor-graph smoother on the
+identical denied windows, once with an oracle visual factor and once with a real
+monocular front-end scaled by the nadir LiDAR; the environment measures the gap
+between them, localizing the deficit to visual scale.
 The environment, not any single estimator, is the contribution; absolute values
 are simulator-specific.
 
@@ -73,18 +80,31 @@ hardware-in-the-loop unchanged.
 \section{SIMULATION ENVIRONMENT}
 \label{sec:method}
 
-\vspace{-2mm}
+% Cena e resultado na MESMA linha: o abstract tem 2 paginas, e dois blocos de
+% figura empilhados custavam quase um terco de pagina em margens e legendas.
+\vspace{-1mm}
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.52\textwidth]{../figures/wsc26_gnss_scene.png}
-\vspace{-2mm}
-\caption{Simulated urban scene. Demonstration flights use $250$\,m AGL so drift is
-not confounded by collisions with the high-rise canopy.}
-\label{fig:scene}
+\begin{minipage}[b]{0.455\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../figures/wsc26_gnss_scene.png}
+  \\[1pt]{\scriptsize (a) Urban scene and vehicle}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.525\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../figures/gnss_vio250_fg_compact.png}
+  \\[1pt]{\scriptsize (b) Error after GNSS denial ($N{=}3$, median and p05--p95)}
+\end{minipage}
+\vspace{-1mm}
+\caption{(a)~The simulated environment; demonstration flights use $250$\,m AGL so
+drift is not confounded by collisions with the high-rise canopy.
+(b)~What it produces: the EKF2 inertial baseline against a factor-graph smoother
+replayed on the identical denied windows.}
+\label{fig:main}
 \end{figure}
 \vspace{-3mm}
 
-Vehicle dynamics, sensors, and the urban scene (Figure~\ref{fig:scene}) come from
+Vehicle dynamics, sensors, and the urban scene (Figure~\ref{fig:main}a) come from
 Cosys-AirSim~\cite{jansen2023cosys}.
 State estimation and control come from PX4 SITL, coupled over TCP in lockstep so
 simulator and autopilot never free-run relative to each other.
@@ -102,7 +122,8 @@ leaving it at its GNSS default removes every altitude source when GNSS is cut.
 
 \textbf{Recorded streams.}
 Each run logs local position, truth, raw inertial, barometric and magnetic
-measurements, and per-sweep LiDAR structure on one time base.
+measurements, nadir camera frames, and nadir LiDAR sweeps on one time base, so an
+offline estimator sees exactly what an onboard one would.
 Repetitions reuse a warm estimator that has reconverged with GNSS aiding before each
 outage; fusion is restored between flights so denied windows remain independent even
 when the autopilot process is not restarted.
@@ -110,28 +131,32 @@ when the autopilot process is not restarted.
 \section{DEMONSTRATION}
 \label{sec:results}
 
-\vspace{-2mm}
-\begin{figure}[htb]
-\centering
-\includegraphics[width=0.92\textwidth]{../figures/gnss_wsc250_fg.png}
-\vspace{-2mm}
-\caption{Left: position error after GNSS denial---EKF2 inertial baseline versus a
-factor-graph smoother on the same logs (median and p05--p95, $N{=}3$).
-Right: top view for a representative run.}
-\label{fig:fg}
-\end{figure}
-\vspace{-3mm}
-
 Over $3$ repetitions, EKF2 position error during the outage grows as
-$|e| \approx 0.15\,t^{1.92}$, reaching $86$\,m median ($66$--$308$) after about
-$33$\,s---the inertial reference a navigation estimator must beat.
+$|e| \approx 0.20\,t^{1.96}$, reaching $239$\,m median ($101$--$339$) after about
+$31$\,s---the inertial reference a navigation estimator must beat.
+Baseline flights with GNSS active bound the measurement floor at $1.9$\,m (p95).
 As a first consumer of the logged streams, we replay a batch factor-graph smoother
-with IMU and barometric factors from the CSV plus simulated visual relative-pose
-factors (ground truth with $0.12$\,m noise), standing in for a VIO front-end until
-camera logs are wired.
-On the same denied windows the smoother cuts median terminal error from $88$\,m to
-$3.1$\,m (about $28\times$; Figure~\ref{fig:fg}), showing that the environment
-supports graded comparison of estimator structure under a controlled outage.
+on the identical windows.
+Its visual factors come from a monocular front-end on the recorded nadir frames:
+ORB correspondences, an essential-matrix decomposition de-rotated with the vehicle
+attitude, and metric scale recovered by comparing triangulated depth against the
+nadir LiDAR range over the matching field of view.
+Against truth the front-end's translation direction has a median error of
+\TODOVIO{} degrees and its scale a root-mean-square error of \TODOSCALE{}\,m.
+Every factor weight is the measured error of that stream rather than a tuned
+value, which the environment makes possible because truth is available per sample.
+
+The comparison the environment enables is the point.
+Substituting an \emph{oracle} visual factor---ground-truth displacement with
+$0.12$\,m noise, i.e.\ direction \emph{and} scale---cuts median terminal error
+$169\times$ on these same windows, whereas the real front-end yields
+\TODOGAIN{}$\times$
+(\TODOEKF{}\,m to \TODOFG{}\,m; Figure~\ref{fig:main}b).
+The gap is informative rather than disappointing: it localizes the deficit to
+visual \emph{scale}, since inertial drift accumulates in magnitude and a
+direction-only factor leaves it almost untouched.
+Quantifying that split requires exactly what the environment supplies---a
+controlled outage with synchronized truth for every stream.
 
 \section{CONCLUSIONS AND ONGOING WORK}
 \label{sec:concl}
@@ -139,9 +164,9 @@ The environment supplies controllable outages, synchronized sensing, exact truth
 repeatability with a real autopilot in the loop.
 Absolute drift reflects the simulator's inertial noise model rather than a specific
 airframe.
-Ongoing work replaces the simulated visual factors with a real image front-end on
-the same scenarios, extends revocation toward receiver-level urban multipath, and
-moves the profiles to hardware-in-the-loop unchanged over MAVLink.
+Ongoing work tightens the visual front-end into a windowed bundle adjustment,
+extends revocation toward receiver-level urban multipath, and moves the profiles to
+hardware-in-the-loop unchanged over MAVLink.
 
 \enlargethispage{30mm}
 \vspace{-2mm}

@@ -309,6 +309,30 @@ Isso volta tudo ao default; o `EKF2_HGT_REF` também é perdido, e o
 `ensure_baro_height_ref()` vai pedir um restart na próxima execução (comportamento
 esperado, ver seção 5).
 
+### Validar o corredor não basta: valide também a coluna de subida
+
+`probe_gnss_corridor.py` verifica a linha reta **na altitude de cruzeiro**. Isso
+não cobre a subida: o veículo decola de onde pousou, e no vaivém um dos extremos
+da perna pode cair debaixo de um prédio.
+
+Observado na `campaign_vio250`: o voo anterior terminou em X≈226, o seguinte
+decolou dali e **colidiu a 58 m durante a subida**, ainda dentro do dossel — em
+X≈226, que é justamente a região bloqueada que a sonda já apontava a 60 m.
+
+Sintoma característico: colisão com `alt` bem abaixo da altitude de cruzeiro e
+`t` pequeno (na fase de subida), não no meio da perna.
+
+Mitigações, em ordem de custo:
+- sondar também a coluna vertical nos dois extremos da perna antes da campanha;
+- escolher o comprimento da perna para que ambos os extremos caiam em colunas
+  livres (X≈0 e X≈250 no corredor E=0 desta cena — o extremo em 226 era o
+  problema);
+- ou voltar ao ponto de partida antes de pousar, para que toda decolagem
+  aconteça na mesma coluna validada.
+
+A detecção de colisão + reposição do voo (`--max-retries`) absorve o caso quando
+ele acontece, mas cada ocorrência custa um voo.
+
 ### Reiniciar o PX4 no meio da sessão quebra o lockstep
 
 **Sintoma:** o primeiro voo da sessão funciona; do segundo em diante, todos falham

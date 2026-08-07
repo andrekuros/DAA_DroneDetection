@@ -1,0 +1,60 @@
+{
+  "campaign": "campaign_vio250",
+  "n_runs": 3,
+  "vo_sigma_m": 0.12,
+  "err_ekf_final_median_m": 241.28609459777732,
+  "err_fg_final_median_m": 153.5712722555067,
+  "improvement_median_x": 1.5711668663936942,
+  "runs": [
+    {
+      "n_keyframes": 70,
+      "cost": 107.49700971172767,
+      "err_fg_final_m": 92.77896349599338,
+      "err_ekf_final_m": 103.2649509177566,
+      "err_fg_mean_m": 38.3758296344267,
+      "err_ekf_mean_m": 34.67125147962068,
+      "improvement_final_x": 1.1130211744844083,
+      "vo_sigma_m": null,
+      "vio_mode": "real",
+      "n_vio_pairs": 19,
+      "n_vio_factors": 17,
+      "n_vio_scaled": 7,
+      "agl_factor": true,
+      "run": "denied_rep01"
+    },
+    {
+      "n_keyframes": 48,
+      "cost": 130.02415939417904,
+      "err_fg_final_m": 153.5712722555067,
+      "err_ekf_final_m": 241.28609459777732,
+      "err_fg_mean_m": 46.37758268989641,
+      "err_ekf_mean_m": 83.65575743081008,
+      "improvement_final_x": 1.5711668663936942,
+      "vo_sigma_m": null,
+      "vio_mode": "real",
+      "n_vio_pairs": 22,
+      "n_vio_factors": 12,
+      "n_vio_scaled": 5,
+      "agl_factor": true,
+      "run": "denied_rep02"
+    },
+    {
+      "n_keyframes": 61,
+      "cost": 53.23317738563279,
+      "err_fg_final_m": 274.2357653986962,
+      "err_ekf_final_m": 345.24960356258896,
+      "err_fg_mean_m": 77.30770971419778,
+      "err_ekf_mean_m": 121.24000444073202,
+      "improvement_final_x": 1.2589517748009627,
+      "vo_sigma_m": null,
+      "vio_mode": "real",
+      "n_vio_pairs": 32,
+      "n_vio_factors": 14,
+      "n_vio_scaled": 8,
+      "agl_factor": true,
+      "run": "denied_rep03"
+    }
+  ],
+  "note": "Visual factors are unit translation directions from a monocular ORB/essential-matrix front-end on the recorded nadir frames; scale comes from IMU and barometer. LiDAR nadir supplies a height-change factor.",
+  "vio_mode": "real"
+}

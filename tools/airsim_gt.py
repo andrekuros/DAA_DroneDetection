@@ -225,6 +225,20 @@ class AirSimGroundTruth:
         except Exception:
             pass
 
+        # Ancorar o timestamp de colisao no estado ATUAL da cena.
+        #
+        # `simGetCollisionInfo` guarda a ultima colisao de sempre, e o AirSim nao
+        # a limpa entre voos. Cada voo roda em processo novo, entao sem esta ancora
+        # `_last_collision_ts` comeca em 0, a primeira leitura ja difere, e o run e
+        # marcado como colidido em t=0 com o impacto do voo ANTERIOR. Na campanha
+        # isso vira cascata: todo retry nasce contaminado e queima o orcamento de
+        # reposicao sem nunca produzir um voo limpo.
+        try:
+            ci = self.client.simGetCollisionInfo(vehicle_name=self.vehicle_name)
+            self._last_collision_ts = int(getattr(ci, "time_stamp", 0) or 0)
+        except Exception:
+            self._last_collision_ts = 0
+
     def get_ground_truth(self) -> GroundTruthSample:
         """
         Pose real do veiculo. Chamada RPC BLOQUEANTE — no orquestrador assincrono
