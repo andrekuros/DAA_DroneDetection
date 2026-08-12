@@ -6,6 +6,7 @@ pywin32
 numpy
 ultralytics>=8.0
 
-# Experimento GNSS-denied (PX4 SITL): tools/run_gnss_denial_experiment.py
+# GNSS-denied bench: pip install -e ./gnss_bench  (also pulls these)
 mavsdk
 matplotlib
+scipy

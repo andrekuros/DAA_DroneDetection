@@ -12,12 +12,26 @@ DAA_DroneDetection/
 │   ├── experiment_controller.py   # Controlador principal de experimentos
 │   ├── scenarios.py               # Definições de cenários (26 cenários pré-configurados)
 │   └── screen_capture.py          # Captura de tela em tempo real (monitor de execução)
+├── gnss_bench/                    # GNSS-denied lockstep bench (PX4 + Cosys-AirSim)
 ├── config/
 │   ├── cosys_airsim_settings.json # Settings para Cosys-AirSim (Documents/AirSim)
 │   └── materials.csv               # Lista de materiais para segmentação (Documents/AirSim)
 ├── requirements.txt
 └── README.md
 ```
+
+### GNSS-denied bench
+
+Separate from the DAA capture track: Cosys-AirSim lockstep with PX4 SITL, in-flight
+GNSS denial, CSV/frame logging, and offline VIO / factor-graph replay.
+
+```powershell
+pip install -e ./gnss_bench
+gnss-bench fly --dry-run
+```
+
+See [`gnss_bench/README.md`](gnss_bench/README.md) and
+[`docs/gnss_bench_guide.md`](docs/gnss_bench_guide.md).
 
 ---
 

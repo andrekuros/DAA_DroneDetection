@@ -1,5 +1,8 @@
 # GNSS-denied — estado atual e pontos para retomar
 
+> **User guide:** [gnss_bench_guide.md](gnss_bench_guide.md). This file is a
+> session handoff archive, not the starting point for new users.
+
 Snapshot de 07/08/2026 07:40. Complementa `docs/gnss_denial_setup.md`.
 As seções 1–6 descrevem a campanha `campaign_wsc250`, já concluída. A **seção 7
 é o handoff da sessão em andamento** (VIO real + LiDAR nadir): código alterado,

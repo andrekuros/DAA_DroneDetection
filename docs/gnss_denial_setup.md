@@ -1,5 +1,9 @@
 # Experimento GNSS-denied — Guia de bring-up
 
+> **User guide (framework):** [gnss_bench_guide.md](gnss_bench_guide.md) and
+> [`gnss_bench/README.md`](../gnss_bench/README.md). This file is the lab
+> bring-up archive (WSL, PX4 build, port notes).
+
 Medição da deriva da odometria inercial do EKF2 (PX4 SITL) contra o ground truth
 do Cosys-AirSim, com negação de GNSS em voo.
 
